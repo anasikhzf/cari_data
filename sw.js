@@ -1,4 +1,4 @@
-const CACHE_NAME = 'caridata-v1';
+const CACHE_NAME = 'caridata-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -7,7 +7,9 @@ const ASSETS_TO_CACHE = [
   './js/parser.js',
   './js/searchEngine.js',
   './js/app.js',
-  './manifest.json'
+  './manifest.json',
+  './assets/icon-192.png',
+  './assets/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -33,18 +35,16 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network first strategy with fallback to cache for document links, Cache first for app shell
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return cached, but update in background if online
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
           }
-        }).catch(() => {/* Offline */});
+        }).catch(() => {});
         return cachedResponse;
       }
 
@@ -55,9 +55,7 @@ self.addEventListener('fetch', (event) => {
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         return networkResponse;
-      }).catch(() => {
-        // Offline fallback if needed
-      });
+      }).catch(() => {});
     })
   );
 });
