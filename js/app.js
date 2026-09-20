@@ -81,32 +81,16 @@ class App {
     });
   }
 
-  openInstallGuide() {
-    const modal = document.getElementById('installGuideModal');
-    const nativeBtn = document.getElementById('triggerNativeInstallBtn');
-
-    if (this.deferredInstallPrompt && nativeBtn) {
-      nativeBtn.style.display = 'inline-block';
-    } else if (nativeBtn) {
-      nativeBtn.style.display = 'none';
-    }
-
-    modal?.classList.add('active');
-  }
-
-  closeInstallGuide() {
-    document.getElementById('installGuideModal')?.classList.remove('active');
-  }
-
-  async triggerNativeInstall() {
+  async installPWA() {
     if (this.deferredInstallPrompt) {
       this.deferredInstallPrompt.prompt();
       const choice = await this.deferredInstallPrompt.userChoice;
       if (choice.outcome === 'accepted') {
-        console.log('User installed the PWA app');
+        console.log('Pengguna menyetujui instalasi PWA');
       }
       this.deferredInstallPrompt = null;
-      this.closeInstallGuide();
+    } else {
+      alert('Aplikasi CariData sudah terpasang di Layar Utama HP/Komputer Anda, atau gunakan menu browser "Tambahkan ke Layar Utama".');
     }
   }
 
@@ -161,13 +145,8 @@ class App {
   bindEvents() {
     // Header Buttons
     document.getElementById('themeToggleBtn')?.addEventListener('click', () => this.toggleTheme());
-    document.getElementById('installAppBtn')?.addEventListener('click', () => this.openInstallGuide());
+    document.getElementById('installAppBtn')?.addEventListener('click', () => this.installPWA());
     document.getElementById('addDocBtn')?.addEventListener('click', () => this.openAddModal());
-
-    // Install Modal
-    document.getElementById('closeInstallModalBtn')?.addEventListener('click', () => this.closeInstallGuide());
-    document.getElementById('closeInstallGuideBtn')?.addEventListener('click', () => this.closeInstallGuide());
-    document.getElementById('triggerNativeInstallBtn')?.addEventListener('click', () => this.triggerNativeInstall());
 
     // Add Document Modal
     document.getElementById('closeModalBtn')?.addEventListener('click', () => this.closeAddModal());
