@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CariData - Viewer & Pencarian Spreadsheet Statis</title>
+  <meta name="description" content="Aplikasi web PWA ringan untuk melihat dan mencari data spreadsheet masif secara cepat.">
+  <meta name="theme-color" content="#2563eb">
+  
+  <!-- PWA Manifest & Icons -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><path d='M14 2v6h6' fill='%2360a5fa'/></svg>">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- App Sticky Navbar Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <a href="#" class="brand" onclick="window.app && window.app.showDashboardView(); return false;">
+        <div class="brand-icon">C</div>
+        <span>CariData</span>
+      </a>
+
+      <div class="header-actions">
+        <!-- Install App PWA Button with Clear Text -->
+        <button id="installAppBtn" class="header-action-btn install-btn" title="Instal Aplikasi ke Layar Utama HP / Komputer">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="btn-text">Instal App</span>
+        </button>
+
+        <!-- Theme Toggle Button with Clear Text -->
+        <button id="themeToggleBtn" class="header-action-btn theme-btn" title="Ganti Tampilan Layar (Terang / Gelap / Otomatis)">
+          <span id="themeIconBox" class="icon-inline">
+            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 0-16z"/><path d="M12 4v16a8 8 0 0 0 0-16z"/></svg>
+          </span>
+          <span id="themeTextLabel" class="btn-text">Tema: Auto</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="appContent">
+    <!-- VIEW 1: Dashboard / Storage Main Page -->
+    <section id="dashboardView" class="view-section">
+      <div class="dashboard-hero">
+        <div class="hero-title">
+          <h1>Penyimpanan Dokumen</h1>
+          <p>Pilih file dokumen spreadsheet untuk membuka & mencari data masif secara otomatis.</p>
+        </div>
+        <button id="addDocBtn" class="btn-primary">
+          <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Tambah Link Dokumen
+        </button>
+      </div>
+
+      <!-- File Cards Grid: 2 Columns on Mobile / HP Viewport -->
+      <div id="documentsGrid" class="documents-grid">
+        <!-- Cards dynamically populated by app.js -->
+      </div>
+    </section>
+
+    <!-- VIEW 2: Document Viewer & Massive Search Page -->
+    <section id="documentViewerContainer" class="viewer-container hidden">
+      <div class="viewer-topbar">
+        <div class="viewer-header-row">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button id="backToDashboardBtn" class="back-btn">
+              &larr; Kembali
+            </button>
+            <button id="refreshCurrentDocBtn" class="icon-btn" title="Segarkan Data Live Spreadsheet">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+          </div>
+          <div class="viewer-title-box">
+            <h2 id="viewerDocTitle" class="viewer-title">Judul Dokumen</h2>
+            <span class="view-only-badge">Hanya Lihat Data</span>
+          </div>
+          <div class="search-stats" id="searchStats">
+            Total: 0 baris
+          </div>
+        </div>
+
+        <!-- Sticky Search Toolbar -->
+        <div class="search-toolbar">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" class="search-input" placeholder="Ketik kata kunci untuk mencari data masif di semua kolom..." autocomplete="off">
+            <button id="searchClearBtn" class="search-clear-btn" title="Hapus pencarian">&times;</button>
+          </div>
+
+          <select id="columnFilterSelect" class="filter-select">
+            <option value="-1">Semua Kolom</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Data Table Container -->
+      <div class="table-viewport">
+        <table class="data-table">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      <div class="pagination-bar">
+        <span id="paginationInfo">Halaman 1 dari 1</span>
+        <div class="pagination-controls">
+          <button id="prevPageBtn" class="page-btn" disabled>&larr; Sebelumnya</button>
+          <button id="nextPageBtn" class="page-btn" disabled>Selanjutnya &rarr;</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Paste Document Link -->
+  <div id="addDocModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Tambah Link Dokumen</h3>
+        <button id="closeModalBtn" class="card-btn-danger" style="font-size:1.2rem;">&times;</button>
+      </div>
+      <form id="addDocForm">
+        <div class="form-group">
+          <label for="docUrlInput" class="form-label">Link Dokumen (Google Sheets / CSV / TSV)</label>
+          <input type="url" id="docUrlInput" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/..." required>
+          <p class="form-hint">Pastikan akses spreadsheet sudah dibuka ("Siapa saja yang memiliki link dapat melihat"). Judul file akan diambil secara otomatis dari nama spreadsheet asli.</p>
+        </div>
+        <div class="form-group">
+          <label for="docTitleInput" class="form-label">Kustomisasi Nama Dokumen (Kosongkan untuk otomatis)</label>
+          <input type="text" id="docTitleInput" class="form-input" placeholder="Otomatis mengambil nama Google Sheet...">
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="cancelModalBtn" class="btn-secondary">Batal</button>
+          <button type="submit" id="saveDocBtn" class="btn-primary">Simpan Dokumen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Install App Guide -->
+  <div id="installGuideModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Instal Aplikasi CariData</h3>
+        <button id="closeInstallModalBtn" class="card-btn-danger" style="font-size:1.2rem;">&times;</button>
+      </div>
+      <div style="font-size:0.9rem; color:var(--text-secondary); line-height:1.6; display:flex; flex-direction:column; gap:0.75rem;">
+        <p>Aplikasi ini dapat diinstal di Layar Utama HP / Komputer Anda tanpa melalui Play Store atau App Store.</p>
+        <div style="background:var(--bg-main); padding:0.85rem; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+          <strong style="color:var(--text-primary); display:block; margin-bottom:0.25rem;">📱 Untuk HP Android / Chrome:</strong>
+          Klik menu <strong>3 titik (&vellip;)</strong> di pojok kanan atas browser, lalu pilih <strong>"Tambahkan ke Layar Utama"</strong> atau <strong>"Instal Aplikasi"</strong>.
+        </div>
+        <div style="background:var(--bg-main); padding:0.85rem; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+          <strong style="color:var(--text-primary); display:block; margin-bottom:0.25rem;">🍎 Untuk iPhone / iOS Safari:</strong>
+          Klik tombol <strong>Bagikan (Share)</strong> di bagian bawah browser, lalu pilih <strong>"Tambah ke Layar Utama (Add to Home Screen)"</strong>.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="triggerNativeInstallBtn" class="btn-primary" style="display:none;">Instal Sekarang</button>
+        <button id="closeInstallGuideBtn" class="btn-secondary">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Logic Modules -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
