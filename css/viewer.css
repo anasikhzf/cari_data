@@ -1,0 +1,313 @@
+/* ==========================================================================
+   CariData Viewer CSS - Data Table, Toolbar, Pagination & Utilities
+   ========================================================================== */
+
+/* 1. Document Viewer View */
+.viewer-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 54px);
+  width: 100%;
+  overflow: hidden;
+}
+
+.viewer-topbar {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.viewer-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.viewer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.back-btn {
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.viewer-title-box {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.viewer-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view-only-badge {
+  background-color: var(--accent-badge);
+  color: var(--accent-text);
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.search-stats {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 2. Search Toolbar Component */
+.search-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+@media (min-width: 520px) {
+  .search-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.search-input-wrapper {
+  position: relative;
+  flex: 1;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 2.2rem 0.5rem 2.2rem;
+  background-color: var(--bg-main);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem;
+  display: none;
+  font-size: 1.1rem;
+}
+
+.search-clear-btn.active {
+  display: block;
+}
+
+.filter-select {
+  padding: 0.5rem 0.75rem;
+  background-color: var(--bg-main);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+/* 3. Data Table Viewport */
+.table-viewport {
+  flex: 1;
+  overflow: auto;
+  background-color: var(--bg-main);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+  background-color: var(--bg-surface);
+}
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+}
+
+.data-table th:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+.data-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  color: var(--text-primary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table tr:hover td {
+  background-color: var(--bg-hover);
+}
+
+.row-num-cell {
+  background-color: var(--bg-main);
+  color: var(--text-muted);
+  font-family: monospace;
+  font-size: 0.7rem;
+  text-align: center;
+  width: 40px;
+  min-width: 40px;
+  user-select: none;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+mark.highlight {
+  background-color: var(--highlight-bg);
+  color: var(--highlight-text);
+  padding: 0.1em 0.2em;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* 4. Pagination & Loading Spinner */
+.pagination-bar {
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  padding: 0.4rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.page-btn {
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* 5. Mobile HP Specific Responsive Tweaks */
+@media (max-width: 480px) {
+  .header-container { padding: 0.4rem 0.5rem; }
+  .brand-title { font-size: 0.95rem; }
+  .digital-clock { padding: 0.25rem 0.45rem; font-size: 0.725rem; }
+  .clock-icon { width: 13px; height: 13px; }
+  .header-action-btn { padding: 0.3rem 0.45rem; height: 32px; font-size: 0.725rem; }
+  .header-action-btn svg { width: 14px; height: 14px; }
+  .btn-text { font-size: 0.725rem; }
+  .viewer-title { font-size: 0.85rem; }
+  .view-only-badge { display: none; }
+  .search-stats { font-size: 0.7rem; }
+  .data-table th, .data-table td { padding: 0.45rem 0.5rem; font-size: 0.75rem; max-width: 150px; }
+}
+
+@media (max-width: 360px) {
+  .brand-title { display: none; }
+}

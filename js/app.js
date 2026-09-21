@@ -1,12 +1,24 @@
 import { db } from './db.js';
 import { DocumentParser } from './parser.js';
-import { SearchEngine, searchEngine } from './searchEngine.js';
+import { searchEngine } from './searchEngine.js';
+import { CONFIG } from '../data/config.js';
+import { UIController } from './uiController.js';
+import { ViewerController } from './viewerController.js';
 
 class App {
   constructor() {
     this.currentTheme = localStorage.getItem('caridata_theme') || 'auto';
     this.deferredInstallPrompt = null;
     this.activeDocument = null;
+    this.currentFolderId = null;
+    this.currentFolder = null;
+    this.masterSheetUrl = localStorage.getItem(CONFIG.STORAGE_KEY_MASTER_URL) || CONFIG.MASTER_SHEET_URL || '';
+
+    this.pendingPinCallback = null;
+    this.pendingPinTargetHash = null;
+
+    this.ui = new UIController(this);
+    this.viewer = new ViewerController(this);
 
     this.init();
   }
@@ -19,16 +31,38 @@ class App {
 
     try {
       await db.init();
-      await this.ensureSampleData();
-      await this.renderDashboard();
+      await this.runAutoCleanup();
+      await this.handleUrlQueryImport();
+      
+      if (this.masterSheetUrl) {
+        await this.syncFromMasterSheet(this.masterSheetUrl);
+      } else {
+        await this.ensureSampleData();
+      }
+
+      await this.ui.renderDashboard();
     } catch (err) {
       console.error('Initialization error:', err);
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Realtime Digital Clock (Jam, Menit, Detik)                                 */
-  /* -------------------------------------------------------------------------- */
+  async runAutoCleanup() {
+    try {
+      const result = await db.performAutoCleanup(30);
+      const totalDeleted = result.deletedDocsCount + result.deletedFoldersCount;
+      if (totalDeleted > 0) {
+        const banner = document.getElementById('cleanupNoticeBanner');
+        const textEl = document.getElementById('cleanupNoticeText');
+        if (banner && textEl) {
+          textEl.textContent = `🧹 Pembersihan Otomatis: ${totalDeleted} dokumen/folder yang tidak pernah dibuka selama 1 bulan telah dihapus secara otomatis.`;
+          banner.classList.remove('hidden');
+        }
+      }
+    } catch (e) {
+      console.warn('Auto cleanup error:', e);
+    }
+  }
+
   initClock() {
     const updateTime = () => {
       const clockEl = document.getElementById('clockTime');
@@ -44,9 +78,6 @@ class App {
     setInterval(updateTime, 1000);
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Theme Switcher                                                             */
-  /* -------------------------------------------------------------------------- */
   setupTheme() {
     document.documentElement.setAttribute('data-theme', this.currentTheme);
     this.updateThemeIcon();
@@ -64,27 +95,19 @@ class App {
   updateThemeIcon() {
     const iconBox = document.getElementById('themeIconBox');
     const textLabel = document.getElementById('themeTextLabel');
-    const btn = document.getElementById('themeToggleBtn');
-    if (!btn) return;
 
     if (this.currentTheme === 'auto') {
       if (iconBox) iconBox.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 0-16z"/><path d="M12 4v16a8 8 0 0 0 0-16z"/></svg>`;
       if (textLabel) textLabel.textContent = 'Auto';
-      btn.setAttribute('title', 'Tema: Otomatis (Mengikuti Sistem HP/Laptop)');
     } else if (this.currentTheme === 'light') {
       if (iconBox) iconBox.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`;
       if (textLabel) textLabel.textContent = 'Terang';
-      btn.setAttribute('title', 'Tema: Mode Terang');
     } else {
       if (iconBox) iconBox.innerHTML = `<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
       if (textLabel) textLabel.textContent = 'Gelap';
-      btn.setAttribute('title', 'Tema: Mode Gelap');
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* PWA Registration & Install Modal Handler                                   */
-  /* -------------------------------------------------------------------------- */
   setupPWA() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
@@ -104,71 +127,110 @@ class App {
     if (this.deferredInstallPrompt) {
       this.deferredInstallPrompt.prompt();
       const choice = await this.deferredInstallPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        console.log('Pengguna menyetujui instalasi PWA');
-      }
+      if (choice.outcome === 'accepted') console.log('Pengguna menyetujui PWA');
       this.deferredInstallPrompt = null;
     } else {
-      const guideModal = document.getElementById('installGuideModal');
-      if (guideModal) guideModal.classList.add('active');
+      document.getElementById('installGuideModal')?.classList.add('active');
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Default Sample Data Generator for Immediate Testing                        */
-  /* -------------------------------------------------------------------------- */
+  async syncFromMasterSheet(masterUrl) {
+    if (!masterUrl) return;
+    try {
+      const docs = await DocumentParser.parseMasterIndexSheet(masterUrl);
+      if (docs && docs.length > 0) {
+        for (const doc of docs) {
+          doc.folderId = this.currentFolderId;
+          await db.saveDocument(doc);
+        }
+      }
+    } catch (err) {
+      console.warn('Master sheet sync error:', err);
+    }
+  }
+
+  async handleUrlQueryImport() {
+    const params = new URLSearchParams(window.location.search);
+    let docUrl = params.get('url') || params.get('sheet') || '';
+    const b64 = params.get('b64');
+    const docTitle = params.get('title') || '';
+
+    if (b64) {
+      try { docUrl = atob(b64); } catch { docUrl = decodeURIComponent(b64); }
+    }
+
+    if (docUrl) {
+      try {
+        const docData = await DocumentParser.parseFromUrl(docUrl, docTitle);
+        await db.saveDocument(docData);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (err) {
+        console.warn('URL auto-import failed:', err);
+      }
+    }
+  }
+
   async ensureSampleData() {
     const existing = await db.getAllDocuments();
     if (existing.length === 0) {
-      const sampleHeaders = ['ID', 'Nama Barang / Layanan', 'Kategori', 'Stok', 'Harga Satuan', 'Lokasi Rak', 'Status'];
-      const categories = ['Elektronik', 'Alat Tulis', 'Aksesoris', 'Komputer', 'Jaringan', 'Perlengkapan Kantor'];
-      const sampleRows = [];
-
-      for (let i = 1; i <= 250; i++) {
-        const cat = categories[i % categories.length];
-        const stok = Math.floor(Math.random() * 500) + 5;
-        const harga = (Math.floor(Math.random() * 150) + 10) * 5000;
-        const hargaFormatted = 'Rp ' + harga.toLocaleString('id-ID');
-        const rak = `Rak ${String.fromCharCode(65 + (i % 6))}-${(i % 10) + 1}`;
-        const status = stok < 20 ? 'Stok Penipisan' : 'Tersedia';
-
-        sampleRows.push([
-          `BRG-${1000 + i}`,
-          `Item Contoh ${i} (${cat})`,
-          cat,
-          stok.toString(),
-          hargaFormatted,
-          rak,
-          status
-        ]);
+      try {
+        const res = await fetch('./data/default_documents.json');
+        if (res.ok) {
+          const defaultData = await res.json();
+          if (defaultData && defaultData.documents) {
+            for (const doc of defaultData.documents) {
+              await db.saveDocument(doc);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load default static documents:', e);
       }
-
-      const sampleDoc = {
-        id: 'doc_sample_inventory',
-        name: 'Sampel Inventory Data (250 Item)',
-        sourceUrl: '',
-        headers: sampleHeaders,
-        rows: sampleRows,
-        rowCount: sampleRows.length,
-        colCount: sampleHeaders.length,
-        updatedAt: new Date().toISOString(),
-        badgeColor: '#2563eb'
-      };
-
-      await db.saveDocument(sampleDoc);
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Event Listeners & UI Binding                                               */
-  /* -------------------------------------------------------------------------- */
   bindEvents() {
-    // Header Buttons
     document.getElementById('themeToggleBtn')?.addEventListener('click', () => this.toggleTheme());
     document.getElementById('installAppBtn')?.addEventListener('click', () => this.installPWA());
-    document.getElementById('addDocBtn')?.addEventListener('click', () => this.openAddModal());
+
+    // Folder Actions
+    document.getElementById('addFolderBtn')?.addEventListener('click', () => this.openFolderModal());
+    document.getElementById('closeFolderModalBtn')?.addEventListener('click', () => this.closeFolderModal());
+    document.getElementById('cancelFolderModalBtn')?.addEventListener('click', () => this.closeFolderModal());
+    document.getElementById('addFolderForm')?.addEventListener('submit', (e) => this.handleAddFolderSubmit(e));
+
+    // Security PIN Modal
+    document.getElementById('closePinModalBtn')?.addEventListener('click', () => {
+      document.getElementById('securityPinModal')?.classList.remove('active');
+    });
+    document.getElementById('cancelPinModalBtn')?.addEventListener('click', () => {
+      document.getElementById('securityPinModal')?.classList.remove('active');
+    });
+    document.getElementById('securityPinForm')?.addEventListener('submit', (e) => this.verifyPinSubmit(e));
+
+    // Master Sheet Cloud Settings Modal
+    document.getElementById('masterSheetBtn')?.addEventListener('click', () => this.openMasterModal());
+    document.getElementById('closeMasterModalBtn')?.addEventListener('click', () => this.closeMasterModal());
+    document.getElementById('cancelMasterModalBtn')?.addEventListener('click', () => this.closeMasterModal());
+    document.getElementById('masterSheetForm')?.addEventListener('submit', (e) => this.handleMasterSubmit(e));
+    document.getElementById('clearMasterBtn')?.addEventListener('click', () => this.clearMasterSheetSettings());
+
+    // Sync Cloud Hero Button
+    document.getElementById('syncCloudBtn')?.addEventListener('click', async () => {
+      const syncBtn = document.getElementById('syncCloudBtn');
+      if (syncBtn) syncBtn.style.opacity = '0.5';
+      if (this.masterSheetUrl) {
+        await this.syncFromMasterSheet(this.masterSheetUrl);
+        await this.ui.renderDashboard();
+        alert('✅ Data berhasil disinkronkan dari Master Cloud!');
+      } else {
+        this.openMasterModal();
+      }
+      if (syncBtn) syncBtn.style.opacity = '1';
+    });
 
     // Add Document Modal
+    document.getElementById('addDocBtn')?.addEventListener('click', () => this.openAddModal());
     document.getElementById('closeModalBtn')?.addEventListener('click', () => this.closeAddModal());
     document.getElementById('cancelModalBtn')?.addEventListener('click', () => this.closeAddModal());
     document.getElementById('addDocForm')?.addEventListener('submit', (e) => this.handleAddDocumentSubmit(e));
@@ -182,8 +244,8 @@ class App {
       this.installPWA();
     });
 
-    // Viewer Navigation, Refresh & Search
-    document.getElementById('backToDashboardBtn')?.addEventListener('click', () => this.showDashboardView());
+    // Viewer Navigation & Search
+    document.getElementById('backToDashboardBtn')?.addEventListener('click', () => this.viewer.showDashboardView());
     document.getElementById('refreshCurrentDocBtn')?.addEventListener('click', () => this.refreshCurrentDocument());
 
     const searchInput = document.getElementById('searchInput');
@@ -196,105 +258,124 @@ class App {
         if (val.length > 0) searchClearBtn.classList.add('active');
         else searchClearBtn.classList.remove('active');
       }
-      this.handleSearch();
+      this.viewer.handleSearch();
     });
 
     searchClearBtn?.addEventListener('click', () => {
       if (searchInput) {
         searchInput.value = '';
         searchClearBtn.classList.remove('active');
-        this.handleSearch();
+        this.viewer.handleSearch();
         searchInput.focus();
       }
     });
 
-    columnFilter?.addEventListener('change', () => this.handleSearch());
+    columnFilter?.addEventListener('change', () => this.viewer.handleSearch());
 
     // Pagination
     document.getElementById('prevPageBtn')?.addEventListener('click', () => {
       searchEngine.setPage(searchEngine.currentPage - 1);
-      this.renderTablePage();
+      this.viewer.renderTablePage();
     });
 
     document.getElementById('nextPageBtn')?.addEventListener('click', () => {
       searchEngine.setPage(searchEngine.currentPage + 1);
-      this.renderTablePage();
+      this.viewer.renderTablePage();
     });
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Render Dashboard (Grid of File Cards - 2 Columns on Mobile)               */
-  /* -------------------------------------------------------------------------- */
-  async renderDashboard() {
-    const grid = document.getElementById('documentsGrid');
-    if (!grid) return;
+  openFolderModal() {
+    document.getElementById('addFolderModal')?.classList.add('active');
+    document.getElementById('folderNameInput')?.focus();
+  }
 
-    const docs = await db.getAllDocuments();
+  closeFolderModal() {
+    document.getElementById('addFolderModal')?.classList.remove('active');
+    const form = document.getElementById('addFolderForm');
+    if (form) form.reset();
+  }
 
-    if (docs.length === 0) {
-      grid.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-          </div>
-          <h3>Belum ada dokumen</h3>
-          <p style="font-size:0.85rem; color:var(--text-secondary); max-width:300px;">
-            Klik tombol "+ Tambah Link Dokumen" untuk memasukkan link Google Sheets atau CSV.
-          </p>
-        </div>
-      `;
-      return;
+  async handleAddFolderSubmit(e) {
+    e.preventDefault();
+    const nameInput = document.getElementById('folderNameInput');
+    const pinInput = document.getElementById('folderPinInput');
+    const name = nameInput ? nameInput.value.trim() : '';
+    const pin = pinInput ? pinInput.value.trim() : '';
+
+    if (!name) return;
+
+    const folder = {
+      id: 'folder_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      name: name,
+      pinHash: pin || null,
+      parentId: this.currentFolderId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString()
+    };
+
+    await db.saveFolder(folder);
+    this.closeFolderModal();
+    await this.ui.renderDashboard();
+  }
+
+  async navigateToFolder(folderId) {
+    if (folderId) {
+      const folder = await db.getFolderById(folderId);
+      if (folder && folder.pinHash) {
+        this.ui.requestPinAuth(folder.name, folder.pinHash, async () => {
+          this.currentFolderId = folderId;
+          this.currentFolder = folder;
+          await this.ui.renderDashboard();
+        });
+        return;
+      }
+      this.currentFolderId = folderId;
+      this.currentFolder = folder;
+    } else {
+      this.currentFolderId = null;
+      this.currentFolder = null;
     }
-
-    grid.innerHTML = docs.map(doc => {
-      const updatedDate = new Date(doc.updatedAt).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      return `
-        <div class="doc-card" data-id="${doc.id}">
-          <div class="doc-card-header">
-            <div class="doc-badge" style="background-color:${doc.badgeColor || '#2563eb'};">
-              📄
-            </div>
-            <div class="doc-actions-menu">
-              <button class="card-btn-danger delete-doc-btn" data-id="${doc.id}" title="Hapus Dokumen">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </button>
-            </div>
-          </div>
-          <div class="doc-card-body" onclick="window.app.openDocument('${doc.id}')">
-            <div class="doc-title">${doc.name}</div>
-            <div class="doc-meta">
-              <span>📊 ${doc.rowCount.toLocaleString('id-ID')} baris</span>
-              <span>📋 ${doc.colCount} kolom</span>
-            </div>
-          </div>
-          <div class="doc-card-footer" onclick="window.app.openDocument('${doc.id}')">
-            <span>📅 ${updatedDate}</span>
-            <span class="doc-open-btn">Buka &rarr;</span>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Attach delete handlers
-    grid.querySelectorAll('.delete-doc-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const docId = btn.getAttribute('data-id');
-        this.confirmDeleteDocument(docId);
-      });
-    });
+    await this.ui.renderDashboard();
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Add Document Modal Handlers                                                */
-  /* -------------------------------------------------------------------------- */
+  verifyPinSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('securityPinInput');
+    const errText = document.getElementById('pinErrorMessage');
+    const entered = input ? input.value.trim() : '';
+
+    if (entered === this.pendingPinTargetHash) {
+      document.getElementById('securityPinModal')?.classList.remove('active');
+      const callback = this.pendingPinCallback;
+      this.pendingPinCallback = null;
+      this.pendingPinTargetHash = null;
+      if (callback) callback();
+    } else {
+      if (errText) errText.style.display = 'block';
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+    }
+  }
+
+  openMasterModal() {
+    this.ui.openMasterModal();
+  }
+
+  closeMasterModal() {
+    this.ui.closeMasterModal();
+  }
+
+  handleMasterSubmit(e) {
+    this.ui.handleMasterSubmit(e);
+  }
+
+  clearMasterSheetSettings() {
+    this.ui.clearMasterSheetSettings();
+  }
+
   openAddModal() {
     document.getElementById('addDocModal')?.classList.add('active');
     document.getElementById('docUrlInput')?.focus();
@@ -310,10 +391,12 @@ class App {
     e.preventDefault();
     const urlInput = document.getElementById('docUrlInput');
     const titleInput = document.getElementById('docTitleInput');
+    const pinInput = document.getElementById('docPinInput');
     const submitBtn = document.getElementById('saveDocBtn');
 
     const url = urlInput ? urlInput.value.trim() : '';
     const customTitle = titleInput ? titleInput.value.trim() : '';
+    const pin = pinInput ? pinInput.value.trim() : '';
 
     if (!url) return;
 
@@ -322,10 +405,13 @@ class App {
       submitBtn.innerHTML = `<div class="spinner"></div> Mengunduh...`;
 
       const docData = await DocumentParser.parseFromUrl(url, customTitle);
+      docData.folderId = this.currentFolderId;
+      docData.pinHash = pin || null;
+
       await db.saveDocument(docData);
 
       this.closeAddModal();
-      await this.renderDashboard();
+      await this.ui.renderDashboard();
       this.openDocument(docData.id);
     } catch (err) {
       alert(`Gagal memproses link dokumen:\n${err.message}`);
@@ -335,22 +421,11 @@ class App {
     }
   }
 
-  async confirmDeleteDocument(id) {
-    if (confirm('Apakah Anda yakin ingin menghapus dokumen ini dari penyimpanan lokal?')) {
-      await db.deleteDocument(id);
-      await this.renderDashboard();
-    }
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /* Live Data Sync & Document Refresh                                          */
-  /* -------------------------------------------------------------------------- */
   async refreshCurrentDocument() {
     if (!this.activeDocument || !this.activeDocument.sourceUrl) {
       alert('Dokumen ini adalah data lokal dan tidak terhubung ke link spreadsheet publik.');
       return;
     }
-
     const refreshBtn = document.getElementById('refreshCurrentDocBtn');
     try {
       if (refreshBtn) refreshBtn.style.opacity = '0.5';
@@ -359,6 +434,8 @@ class App {
         this.activeDocument.name,
         this.activeDocument.id
       );
+      updatedDoc.folderId = this.activeDocument.folderId;
+      updatedDoc.pinHash = this.activeDocument.pinHash;
 
       await db.saveDocument(updatedDoc);
       this.activeDocument = updatedDoc;
@@ -367,171 +444,24 @@ class App {
       const titleEl = document.getElementById('viewerDocTitle');
       if (titleEl) titleEl.textContent = updatedDoc.name;
 
-      this.handleSearch();
+      this.viewer.handleSearch();
       alert(`✅ Data berhasil diperbarui langsung dari Google Sheets! (${updatedDoc.rowCount} baris)`);
     } catch (err) {
-      console.warn('Live refresh failed:', err);
       alert(`Tidak dapat menyegarkan data live:\n${err.message}`);
     } finally {
       if (refreshBtn) refreshBtn.style.opacity = '1';
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Document Viewer & Search Controller                                        */
-  /* -------------------------------------------------------------------------- */
-  async openDocument(id) {
-    let doc = await db.getDocumentById(id);
-    if (!doc) {
-      alert('Dokumen tidak ditemukan.');
-      return;
-    }
-
-    this.activeDocument = doc;
-    searchEngine.setDocument(doc);
-
-    // Setup UI
-    document.getElementById('dashboardView')?.classList.add('hidden');
-    document.getElementById('documentViewerContainer')?.classList.remove('hidden');
-
-    const titleEl = document.getElementById('viewerDocTitle');
-    if (titleEl) titleEl.textContent = doc.name;
-
-    // Populate Column Filter Options
-    const select = document.getElementById('columnFilterSelect');
-    if (select) {
-      select.innerHTML = `<option value="-1">Semua Kolom</option>` +
-        doc.headers.map((h, idx) => `<option value="${idx}">Kolom: ${h}</option>`).join('');
-    }
-
-    // Reset search input
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) searchInput.value = '';
-    document.getElementById('searchClearBtn')?.classList.remove('active');
-
-    // Render Table Header
-    this.renderTableHeader(doc.headers);
-    this.handleSearch();
-
-    // Background Auto Live Sync if web sourceUrl exists
-    if (doc.sourceUrl && doc.sourceUrl.startsWith('http')) {
-      DocumentParser.parseFromUrl(doc.sourceUrl, doc.name, doc.id)
-        .then(async (freshDoc) => {
-          if (freshDoc.rowCount !== doc.rowCount || freshDoc.updatedAt !== doc.updatedAt) {
-            await db.saveDocument(freshDoc);
-            if (this.activeDocument && this.activeDocument.id === doc.id) {
-              this.activeDocument = freshDoc;
-              searchEngine.setDocument(freshDoc);
-              if (titleEl) titleEl.textContent = freshDoc.name;
-              this.handleSearch();
-            }
-          }
-        })
-        .catch(() => {/* Ignore background silent fail if offline */});
-    }
-  }
-
-  showDashboardView() {
-    document.getElementById('documentViewerContainer')?.classList.add('hidden');
-    document.getElementById('dashboardView')?.classList.remove('hidden');
-    this.activeDocument = null;
-    this.renderDashboard();
-  }
-
-  renderTableHeader(headers) {
-    const thead = document.getElementById('tableHead');
-    if (!thead) return;
-
-    let html = `<tr><th class="row-num-cell">#</th>`;
-    headers.forEach((h, idx) => {
-      html += `<th onclick="window.app.handleSort(${idx})" title="Klik untuk mengurutkan">${h} <span id="sortIcon_${idx}"></span></th>`;
-    });
-    html += `</tr>`;
-    thead.innerHTML = html;
+  openDocument(id) {
+    this.viewer.openDocument(id);
   }
 
   handleSort(colIdx) {
-    searchEngine.sortByColumn(colIdx);
-    if (this.activeDocument) {
-      this.activeDocument.headers.forEach((_, i) => {
-        const icon = document.getElementById(`sortIcon_${i}`);
-        if (icon) icon.textContent = '';
-      });
-    }
-    const targetIcon = document.getElementById(`sortIcon_${colIdx}`);
-    if (targetIcon) {
-      targetIcon.textContent = searchEngine.sortAscending ? '▲' : '▼';
-    }
-    this.renderTablePage();
-  }
-
-  handleSearch() {
-    const query = document.getElementById('searchInput')?.value || '';
-    const colIdx = document.getElementById('columnFilterSelect')?.value || -1;
-
-    const totalMatches = searchEngine.search(query, colIdx);
-
-    const statsEl = document.getElementById('searchStats');
-    if (statsEl && this.activeDocument) {
-      if (query.trim().length > 0) {
-        statsEl.textContent = `${totalMatches.toLocaleString('id-ID')} / ${this.activeDocument.rowCount.toLocaleString('id-ID')} baris`;
-      } else {
-        statsEl.textContent = `Total: ${this.activeDocument.rowCount.toLocaleString('id-ID')} baris`;
-      }
-    }
-
-    this.renderTablePage();
-  }
-
-  renderTablePage() {
-    const tbody = document.getElementById('tableBody');
-    if (!tbody) return;
-
-    const pageData = searchEngine.getCurrentPageData();
-
-    if (pageData.rows.length === 0) {
-      const colCount = (this.activeDocument ? this.activeDocument.headers.length : 1) + 1;
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="${colCount}" style="text-align:center; padding: 2.5rem 1rem; color:var(--text-muted);">
-            🔍 Tidak ada data yang cocok dengan pencarian "${SearchEngine.highlightText(searchEngine.searchTerm)}".
-          </td>
-        </tr>
-      `;
-    } else {
-      const searchTerm = searchEngine.searchTerm;
-      let html = '';
-
-      for (let i = 0; i < pageData.rows.length; i++) {
-        const rowObj = pageData.rows[i];
-        html += `<tr><td class="row-num-cell">${rowObj.originalIndex}</td>`;
-
-        for (let j = 0; j < rowObj.data.length; j++) {
-          const cellVal = rowObj.data[j] || '';
-          const highlighted = SearchEngine.highlightText(cellVal, searchTerm);
-          html += `<td title="${cellVal}">${highlighted}</td>`;
-        }
-        html += `</tr>`;
-      }
-
-      tbody.innerHTML = html;
-    }
-
-    // Update Pagination UI
-    const paginationInfo = document.getElementById('paginationInfo');
-    if (paginationInfo) {
-      paginationInfo.textContent = `Hal ${pageData.currentPage}/${pageData.totalPages} (${pageData.startItem}-${pageData.endItem})`;
-    }
-
-    const prevBtn = document.getElementById('prevPageBtn');
-    const nextBtn = document.getElementById('nextPageBtn');
-
-    if (prevBtn) prevBtn.disabled = pageData.currentPage <= 1;
-    if (nextBtn) nextBtn.disabled = pageData.currentPage >= pageData.totalPages;
+    this.viewer.handleSort(colIdx);
   }
 }
 
-// Global instantiation
 window.addEventListener('DOMContentLoaded', () => {
   window.app = new App();
 });
