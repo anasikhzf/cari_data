@@ -63,6 +63,8 @@ class App {
       console.warn('Auto cleanup error:', e);
     }
   }
+
+  initClock() {
     const updateTime = () => {
       const clockEl = document.getElementById('clockTime');
       if (!clockEl) return;
