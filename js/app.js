@@ -14,6 +14,7 @@ class App {
   async init() {
     this.setupTheme();
     this.setupPWA();
+    this.initClock();
     this.bindEvents();
 
     try {
@@ -26,7 +27,25 @@ class App {
   }
 
   /* -------------------------------------------------------------------------- */
-  /* Theme Switcher (Auto, Light, Dark - Icons Only)                            */
+  /* Realtime Digital Clock (Jam, Menit, Detik)                                 */
+  /* -------------------------------------------------------------------------- */
+  initClock() {
+    const updateTime = () => {
+      const clockEl = document.getElementById('clockTime');
+      if (!clockEl) return;
+      const now = new Date();
+      const hrs = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const secs = String(now.getSeconds()).padStart(2, '0');
+      clockEl.textContent = `${hrs}:${mins}:${secs}`;
+    };
+
+    updateTime();
+    setInterval(updateTime, 1000);
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* Theme Switcher                                                             */
   /* -------------------------------------------------------------------------- */
   setupTheme() {
     document.documentElement.setAttribute('data-theme', this.currentTheme);
@@ -50,16 +69,16 @@ class App {
 
     if (this.currentTheme === 'auto') {
       if (iconBox) iconBox.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 0-16z"/><path d="M12 4v16a8 8 0 0 0 0-16z"/></svg>`;
-      if (textLabel) textLabel.textContent = 'Tema: Otomatis';
+      if (textLabel) textLabel.textContent = 'Auto';
       btn.setAttribute('title', 'Tema: Otomatis (Mengikuti Sistem HP/Laptop)');
     } else if (this.currentTheme === 'light') {
       if (iconBox) iconBox.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`;
-      if (textLabel) textLabel.textContent = 'Tema: Terang';
-      btn.setAttribute('title', 'Tema: Mode Terang (Layar Putih)');
+      if (textLabel) textLabel.textContent = 'Terang';
+      btn.setAttribute('title', 'Tema: Mode Terang');
     } else {
       if (iconBox) iconBox.innerHTML = `<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
-      if (textLabel) textLabel.textContent = 'Tema: Gelap';
-      btn.setAttribute('title', 'Tema: Mode Gelap (Layar Hitam)');
+      if (textLabel) textLabel.textContent = 'Gelap';
+      btn.setAttribute('title', 'Tema: Mode Gelap');
     }
   }
 
@@ -90,7 +109,8 @@ class App {
       }
       this.deferredInstallPrompt = null;
     } else {
-      alert('Aplikasi CariData sudah terpasang di Layar Utama HP/Komputer Anda, atau gunakan menu browser "Tambahkan ke Layar Utama".');
+      const guideModal = document.getElementById('installGuideModal');
+      if (guideModal) guideModal.classList.add('active');
     }
   }
 
@@ -152,6 +172,15 @@ class App {
     document.getElementById('closeModalBtn')?.addEventListener('click', () => this.closeAddModal());
     document.getElementById('cancelModalBtn')?.addEventListener('click', () => this.closeAddModal());
     document.getElementById('addDocForm')?.addEventListener('submit', (e) => this.handleAddDocumentSubmit(e));
+
+    // Install Guide Modal Close Buttons
+    const closeInstall = () => document.getElementById('installGuideModal')?.classList.remove('active');
+    document.getElementById('closeInstallModalBtn')?.addEventListener('click', closeInstall);
+    document.getElementById('closeInstallGuideBtn')?.addEventListener('click', closeInstall);
+    document.getElementById('triggerNativeInstallBtn')?.addEventListener('click', () => {
+      closeInstall();
+      this.installPWA();
+    });
 
     // Viewer Navigation, Refresh & Search
     document.getElementById('backToDashboardBtn')?.addEventListener('click', () => this.showDashboardView());
@@ -241,7 +270,7 @@ class App {
           <div class="doc-card-body" onclick="window.app.openDocument('${doc.id}')">
             <div class="doc-title">${doc.name}</div>
             <div class="doc-meta">
-              <span>📊 ${doc.rowCount.toLocaleString('id-ID')} baris data</span>
+              <span>📊 ${doc.rowCount.toLocaleString('id-ID')} baris</span>
               <span>📋 ${doc.colCount} kolom</span>
             </div>
           </div>
@@ -290,7 +319,7 @@ class App {
 
     try {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = `<div class="spinner"></div> Mengunduh Nama & Data...`;
+      submitBtn.innerHTML = `<div class="spinner"></div> Mengunduh...`;
 
       const docData = await DocumentParser.parseFromUrl(url, customTitle);
       await db.saveDocument(docData);
@@ -445,9 +474,9 @@ class App {
     const statsEl = document.getElementById('searchStats');
     if (statsEl && this.activeDocument) {
       if (query.trim().length > 0) {
-        statsEl.textContent = `Ditemukan ${totalMatches.toLocaleString('id-ID')} dari ${this.activeDocument.rowCount.toLocaleString('id-ID')} baris`;
+        statsEl.textContent = `${totalMatches.toLocaleString('id-ID')} / ${this.activeDocument.rowCount.toLocaleString('id-ID')} baris`;
       } else {
-        statsEl.textContent = `Total: ${this.activeDocument.rowCount.toLocaleString('id-ID')} baris data`;
+        statsEl.textContent = `Total: ${this.activeDocument.rowCount.toLocaleString('id-ID')} baris`;
       }
     }
 
@@ -491,7 +520,7 @@ class App {
     // Update Pagination UI
     const paginationInfo = document.getElementById('paginationInfo');
     if (paginationInfo) {
-      paginationInfo.textContent = `Halaman ${pageData.currentPage} dari ${pageData.totalPages} (${pageData.startItem}-${pageData.endItem})`;
+      paginationInfo.textContent = `Hal ${pageData.currentPage}/${pageData.totalPages} (${pageData.startItem}-${pageData.endItem})`;
     }
 
     const prevBtn = document.getElementById('prevPageBtn');

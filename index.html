@@ -2,10 +2,10 @@
 <html lang="id" data-theme="auto">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CariData - Viewer & Pencarian Spreadsheet Statis</title>
   <meta name="description" content="Aplikasi web PWA ringan untuk melihat dan mencari data spreadsheet masif secara cepat.">
-  <meta name="theme-color" content="#2563eb">
+  <meta name="theme-color" content="#0f172a">
   
   <!-- PWA & Mobile Optimization -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -17,7 +17,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><path d='M14 2v6h6' fill='%2360a5fa'/></svg>">
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f172a'/><rect x='8' y='8' width='84' height='84' rx='18' fill='none' stroke='%232563eb' stroke-width='4'/><path d='M65 33 A 26 26 0 1 0 65 67' fill='none' stroke='%23ffffff' stroke-width='10' stroke-linecap='round'/><circle cx='65' cy='33' r='5' fill='%2338bdf8'/></svg>">
   
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="styles.css">
@@ -28,23 +29,39 @@
   <header class="app-header">
     <div class="header-container">
       <a href="#" class="brand" onclick="window.app && window.app.showDashboardView(); return false;">
-        <div class="brand-icon">C</div>
-        <span>CariData</span>
+        <div class="brand-icon">
+          <svg viewBox="0 0 100 100" class="brand-svg">
+            <rect width="100" height="100" rx="24" fill="#0f172a"/>
+            <rect x="7" y="7" width="86" height="86" rx="19" fill="none" stroke="#2563eb" stroke-width="5"/>
+            <path d="M 66 32 A 26 26 0 1 0 66 68" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round"/>
+            <circle cx="66" cy="32" r="5.5" fill="#38bdf8"/>
+          </svg>
+        </div>
+        <span class="brand-title">CariData</span>
       </a>
 
+      <!-- Header Center: Digital Clock (Jam, Menit, Detik Live) -->
+      <div id="digitalClock" class="digital-clock" title="Jam Digital Realtime">
+        <svg class="clock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span id="clockTime" class="clock-time">00:00:00</span>
+      </div>
+
       <div class="header-actions">
-        <!-- Install App PWA Button with Clear Text -->
+        <!-- Install App PWA Button -->
         <button id="installAppBtn" class="header-action-btn install-btn" title="Instal Aplikasi ke Layar Utama HP / Komputer">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span class="btn-text">Instal App</span>
+          <span class="btn-text">Instal</span>
         </button>
 
-        <!-- Theme Toggle Button with Clear Text -->
+        <!-- Theme Toggle Button -->
         <button id="themeToggleBtn" class="header-action-btn theme-btn" title="Ganti Tampilan Layar (Terang / Gelap / Otomatis)">
           <span id="themeIconBox" class="icon-inline">
             <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 0-16z"/><path d="M12 4v16a8 8 0 0 0 0-16z"/></svg>
           </span>
-          <span id="themeTextLabel" class="btn-text">Tema: Auto</span>
+          <span id="themeTextLabel" class="btn-text">Tema</span>
         </button>
       </div>
     </div>
@@ -56,11 +73,11 @@
       <div class="dashboard-hero">
         <div class="hero-title">
           <h1>Penyimpanan Dokumen</h1>
-          <p>Pilih file dokumen spreadsheet untuk membuka & mencari data masif secara otomatis.</p>
+          <p>Pilih file dokumen spreadsheet untuk membuka & mencari data masif secara cepat.</p>
         </div>
         <button id="addDocBtn" class="btn-primary">
           <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Tambah Link Dokumen
+          <span>Tambah Link Dokumen</span>
         </button>
       </div>
 
@@ -74,9 +91,9 @@
     <section id="documentViewerContainer" class="viewer-container hidden">
       <div class="viewer-topbar">
         <div class="viewer-header-row">
-          <div style="display:flex; align-items:center; gap:0.5rem;">
-            <button id="backToDashboardBtn" class="back-btn">
-              &larr; Kembali
+          <div class="viewer-header-left">
+            <button id="backToDashboardBtn" class="back-btn" title="Kembali ke Beranda">
+              &larr; <span class="back-text">Kembali</span>
             </button>
             <button id="refreshCurrentDocBtn" class="icon-btn" title="Segarkan Data Live Spreadsheet">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -84,7 +101,7 @@
           </div>
           <div class="viewer-title-box">
             <h2 id="viewerDocTitle" class="viewer-title">Judul Dokumen</h2>
-            <span class="view-only-badge">Hanya Lihat Data</span>
+            <span class="view-only-badge">Read-Only</span>
           </div>
           <div class="search-stats" id="searchStats">
             Total: 0 baris
@@ -95,7 +112,7 @@
         <div class="search-toolbar">
           <div class="search-input-wrapper">
             <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="searchInput" class="search-input" placeholder="Ketik kata kunci untuk mencari data masif di semua kolom..." autocomplete="off">
+            <input type="text" id="searchInput" class="search-input" placeholder="Cari kata kunci di semua kolom..." autocomplete="off">
             <button id="searchClearBtn" class="search-clear-btn" title="Hapus pencarian">&times;</button>
           </div>
 
@@ -115,10 +132,10 @@
 
       <!-- Pagination Footer -->
       <div class="pagination-bar">
-        <span id="paginationInfo">Halaman 1 dari 1</span>
+        <span id="paginationInfo" class="pagination-info">Halaman 1 dari 1</span>
         <div class="pagination-controls">
-          <button id="prevPageBtn" class="page-btn" disabled>&larr; Sebelumnya</button>
-          <button id="nextPageBtn" class="page-btn" disabled>Selanjutnya &rarr;</button>
+          <button id="prevPageBtn" class="page-btn" disabled>&larr; Prev</button>
+          <button id="nextPageBtn" class="page-btn" disabled>Next &rarr;</button>
         </div>
       </div>
     </section>

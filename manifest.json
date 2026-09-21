@@ -1,13 +1,13 @@
 {
   "id": "./",
-  "name": "CariData - Viewer Spreadsheet Statis",
+  "name": "CariData - Viewer & Pencarian Spreadsheet",
   "short_name": "CariData",
-  "description": "Aplikasi PWA ringan untuk melihat dan mencari data spreadsheet masif.",
-  "start_url": "./index.html",
+  "description": "Aplikasi PWA ringan untuk melihat dan mencari data spreadsheet masif secara cepat.",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#2563eb",
+  "theme_color": "#0f172a",
   "orientation": "any",
   "prefer_related_applications": false,
   "icons": [
