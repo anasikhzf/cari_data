@@ -1,18 +1,18 @@
 /**
  * Cloudflare Pages Function (Server-Side Proxy Endpoint)
  * Runs 100% Server-Side on Cloudflare Workers Edge.
- * Hides raw Google Sheet URLs from client browser DevTools and Network tab.
+ * Hides raw Google Sheet URLs and extracts real Sheet Titles server-side without CORS limits.
  */
 
 export async function onRequest(context) {
   const { request } = context;
   const reqUrl = new URL(request.url);
 
-  // Set CORS headers so PWA can consume data securely
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Expose-Headers': 'X-Sheet-Title',
     'Cache-Control': 'public, max-age=60, s-maxage=300'
   };
 
@@ -22,7 +22,6 @@ export async function onRequest(context) {
 
   let targetUrl = reqUrl.searchParams.get('url') || reqUrl.searchParams.get('target') || '';
 
-  // Decode base64 encoded URL if obfuscated by client
   if (reqUrl.searchParams.get('b64')) {
     try {
       targetUrl = atob(reqUrl.searchParams.get('b64'));
@@ -36,20 +35,44 @@ export async function onRequest(context) {
     });
   }
 
-  // Normalize Google Sheet URL to direct CSV export endpoint on server
+  let sheetId = null;
   let serverFetchUrl = targetUrl.trim();
+
   if (serverFetchUrl.includes('docs.google.com/spreadsheets')) {
     const sheetIdMatch = serverFetchUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     const gidMatch = serverFetchUrl.match(/[?&]gid=([0-9]+)/) || serverFetchUrl.match(/#gid=([0-9]+)/);
     if (sheetIdMatch && sheetIdMatch[1]) {
-      const sheetId = sheetIdMatch[1];
+      sheetId = sheetIdMatch[1];
       const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
       serverFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}`;
     }
   }
 
+  // 1. Server-Side Title Extraction
+  let extractedTitle = '';
+  if (sheetId) {
+    try {
+      const htmlUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`;
+      const htmlRes = await fetch(htmlUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      });
+      if (htmlRes.ok) {
+        const htmlText = await htmlRes.text();
+        const match = htmlText.match(/<title>(.*?)<\/title>/i);
+        if (match && match[1]) {
+          let clean = match[1].replace(/- Google (Sheets|Drive|Dokumen)/gi, '').trim();
+          if (clean && !clean.toLowerCase().includes('google sheets') && clean.length > 1) {
+            extractedTitle = clean;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Server title fetch error:', e);
+    }
+  }
+
+  // 2. Fetch CSV Data Server-Side
   try {
-    // Perform secure Server-Side fetch to Google Servers
     const response = await fetch(serverFetchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Server-Proxy'
@@ -65,13 +88,18 @@ export async function onRequest(context) {
 
     const csvData = await response.text();
 
-    // Return sanitized CSV payload directly without revealing Google Sheet headers or source URLs
+    const responseHeaders = {
+      ...corsHeaders,
+      'Content-Type': 'text/plain; charset=utf-8'
+    };
+
+    if (extractedTitle) {
+      responseHeaders['X-Sheet-Title'] = encodeURIComponent(extractedTitle);
+    }
+
     return new Response(csvData, {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/plain; charset=utf-8'
-      }
+      headers: responseHeaders
     });
 
   } catch (err) {

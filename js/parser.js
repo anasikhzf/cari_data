@@ -1,7 +1,5 @@
 /**
- * Parser utility with Server-Side Proxy integration.
- * Obfuscates and routes raw Google Sheet URLs through backend endpoint (/api/proxy)
- * so sheet links cannot be inspected or snooped in client browser DevTools / Network tab.
+ * Parser utility with Server-Side Proxy & Title Auto-Discovery Integration.
  */
 
 export class DocumentParser {
@@ -37,12 +35,12 @@ export class DocumentParser {
   }
 
   /**
-   * Fetch exact Google Sheet title from HTML page meta title
+   * Fetch exact Google Sheet title via CORS proxy fallback
    */
   static async fetchGoogleSheetTitle(sheetId) {
     try {
-      const pageUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`;
-      const res = await fetch(pageUrl);
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`)}`;
+      const res = await fetch(proxyUrl);
       if (res.ok) {
         const html = await res.text();
         const match = html.match(/<title>(.*?)<\/title>/i);
@@ -53,22 +51,7 @@ export class DocumentParser {
           }
         }
       }
-    } catch (e) {
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`)}`;
-        const res = await fetch(proxyUrl);
-        if (res.ok) {
-          const html = await res.text();
-          const match = html.match(/<title>(.*?)<\/title>/i);
-          if (match && match[1]) {
-            const cleanTitle = match[1].replace(/- Google (Sheets|Drive|Dokumen)/gi, '').trim();
-            if (cleanTitle && !cleanTitle.toLowerCase().includes('google sheets') && cleanTitle.length > 1) {
-              return cleanTitle;
-            }
-          }
-        }
-      } catch {}
-    }
+    } catch (e) {}
     return null;
   }
 
@@ -77,26 +60,25 @@ export class DocumentParser {
    */
   static async parseFromUrl(rawUrl, customTitle = '', existingId = null) {
     let title = customTitle;
-
-    // Try auto-discovering real Google Sheet name if customTitle is blank
-    if (!title && rawUrl.includes('docs.google.com/spreadsheets')) {
-      const sheetIdMatch = rawUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (sheetIdMatch && sheetIdMatch[1]) {
-        const fetchedTitle = await this.fetchGoogleSheetTitle(sheetIdMatch[1]);
-        if (fetchedTitle) title = fetchedTitle;
-      }
-    }
-
-    const b64Url = this.obfuscateUrl(rawUrl);
-    const proxyEndpoint = `/api/proxy?b64=${encodeURIComponent(b64Url)}`;
+    let b64Url = this.obfuscateUrl(rawUrl);
+    let proxyEndpoint = `/api/proxy?b64=${encodeURIComponent(b64Url)}`;
     let fetchedText = null;
 
     // 1. Attempt Server-Side Proxy Fetch
     try {
       const response = await fetch(proxyEndpoint);
       if (response.ok) {
+        // Read X-Sheet-Title header from Server Proxy
+        const serverTitleHeader = response.headers.get('X-Sheet-Title');
+        if (serverTitleHeader && !title) {
+          try {
+            title = decodeURIComponent(serverTitleHeader);
+          } catch {
+            title = serverTitleHeader;
+          }
+        }
+
         const text = await response.text();
-        // Ensure proxy returned valid CSV text, not an HTML error page
         if (text && !text.trim().toLowerCase().startsWith('<!doctype html') && !text.trim().toLowerCase().startsWith('<html')) {
           fetchedText = text;
         }
@@ -105,7 +87,7 @@ export class DocumentParser {
       console.warn('Server-Side Proxy unavailable, trying direct fetch:', err);
     }
 
-    // 2. Direct fetch fallback if proxy unavailable or returned non-CSV
+    // 2. Direct fetch fallback if proxy unavailable
     if (!fetchedText) {
       const targetUrl = this.normalizeUrl(rawUrl);
       try {
@@ -132,6 +114,17 @@ export class DocumentParser {
 
     if (!fetchedText || fetchedText.trim().toLowerCase().startsWith('<!doctype html') || fetchedText.trim().toLowerCase().startsWith('<html')) {
       throw new Error('Gagal membaca data spreadsheet. Pastikan akses Google Sheet sudah diset "Siapa saja yang memiliki link dapat melihat".');
+    }
+
+    // Try fetching title via CORS proxy if title still blank or default
+    if (!title || title.startsWith('Spreadsheet ')) {
+      if (rawUrl.includes('docs.google.com/spreadsheets')) {
+        const sheetIdMatch = rawUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (sheetIdMatch && sheetIdMatch[1]) {
+          const fetchedTitle = await this.fetchGoogleSheetTitle(sheetIdMatch[1]);
+          if (fetchedTitle) title = fetchedTitle;
+        }
+      }
     }
 
     if (!title) {

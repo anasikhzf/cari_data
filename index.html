@@ -288,6 +288,23 @@
     </div>
   </div>
 
+  <!-- Modal: Network Status / Slow Connection Warning -->
+  <div id="networkStatusModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width:400px; text-align:center;">
+      <div style="width:52px; height:52px; border-radius:50%; background:rgba(239, 68, 68, 0.1); color:#ef4444; display:inline-flex; align-items:center; justify-content:center; margin:0 auto 0.75rem auto;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+      </div>
+      <h3 class="modal-title" style="margin-bottom:0.5rem;" id="networkModalTitle">⚠️ Offline / Koneksi Lambat</h3>
+      <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5; margin-bottom:1.25rem;" id="networkModalDesc">
+        Aplikasi CariData membutuhkan internet untuk menyinkronkan data live. Perangkat Anda saat ini terdeteksi luring (offline) atau koneksi lambat.
+      </p>
+      <div class="modal-footer" style="justify-content:center; gap:0.5rem;">
+        <button type="button" id="dismissNetworkModalBtn" class="btn-secondary">Lanjut Offline</button>
+        <button type="button" id="retryConnectionBtn" class="btn-primary">Coba Lagi 🔄</button>
+      </div>
+    </div>
+  </div>
+
   <!-- App Logic Modules -->
   <script type="module" src="js/app.js"></script>
 </body>

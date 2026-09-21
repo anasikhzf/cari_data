@@ -7,6 +7,47 @@ export class UIController {
     this.app = app;
   }
 
+  async checkNetworkStatus(showIfSlow = true) {
+    if (!navigator.onLine) {
+      this.showNetworkModal('⚠️ Perangkat Offline', 'Aplikasi ini membutuhkan koneksi internet untuk menyinkronkan data live. Anda saat ini sedang luring (offline).');
+      return false;
+    }
+
+    if (showIfSlow) {
+      const startTime = Date.now();
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        await fetch('./manifest.json', { cache: 'no-store', signal: controller.signal });
+        clearTimeout(timeoutId);
+        const latency = Date.now() - startTime;
+        if (latency > 3000) {
+          this.showNetworkModal('⚠️ Koneksi Internet Lambat', `Waktu respon jaringan terdeteksi cukup lambat (${latency}ms). Sinkronisasi data live memerlukan waktu lebih lama.`);
+          return false;
+        }
+      } catch (err) {
+        if (!navigator.onLine || err.name === 'AbortError') {
+          this.showNetworkModal('⚠️ Koneksi Terputus / Lambat', 'Tidak dapat terhubung ke internet secara cepat. Pastikan koneksi internet HP Anda terhubung.');
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  showNetworkModal(title, desc) {
+    const modal = document.getElementById('networkStatusModal');
+    const titleEl = document.getElementById('networkModalTitle');
+    const descEl = document.getElementById('networkModalDesc');
+    if (titleEl) titleEl.textContent = title;
+    if (descEl) descEl.textContent = desc;
+    if (modal) modal.classList.add('active');
+  }
+
+  hideNetworkModal() {
+    document.getElementById('networkStatusModal')?.classList.remove('active');
+  }
+
   /* -------------------------------------------------------------------------- */
   /* Dashboard Breadcrumb Navigation                                            */
   /* -------------------------------------------------------------------------- */

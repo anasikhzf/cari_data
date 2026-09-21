@@ -1,8 +1,6 @@
 /**
- * Standalone Node.js Express Server Proxy for Server-Side Security.
+ * Standalone Node.js Express Server Proxy for Server-Side Security & Title Extraction.
  * Hides raw Google Sheet URLs behind server-side proxy route /api/proxy
- * 
- * Usage: node server.js
  */
 
 const express = require('express');
@@ -12,10 +10,8 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve static web app assets
 app.use(express.static(path.join(__dirname, './')));
 
-// Server-Side Proxy Endpoint
 app.get('/api/proxy', async (req, res) => {
   let targetUrl = req.query.url || req.query.target || '';
 
@@ -29,16 +25,38 @@ app.get('/api/proxy', async (req, res) => {
     return res.status(400).json({ error: 'Missing target URL parameter' });
   }
 
-  // Normalize Google Sheet URL on server side
+  let sheetId = null;
   let serverFetchUrl = targetUrl.trim();
+
   if (serverFetchUrl.includes('docs.google.com/spreadsheets')) {
     const sheetIdMatch = serverFetchUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     const gidMatch = serverFetchUrl.match(/[?&]gid=([0-9]+)/) || serverFetchUrl.match(/#gid=([0-9]+)/);
     if (sheetIdMatch && sheetIdMatch[1]) {
-      const sheetId = sheetIdMatch[1];
+      sheetId = sheetIdMatch[1];
       const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
       serverFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}`;
     }
+  }
+
+  // Server-Side Title Extraction
+  let extractedTitle = '';
+  if (sheetId) {
+    try {
+      const htmlUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`;
+      const htmlRes = await fetch(htmlUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      });
+      if (htmlRes.ok) {
+        const htmlText = await htmlRes.text();
+        const match = htmlText.match(/<title>(.*?)<\/title>/i);
+        if (match && match[1]) {
+          let clean = match[1].replace(/- Google (Sheets|Drive|Dokumen)/gi, '').trim();
+          if (clean && !clean.toLowerCase().includes('google sheets') && clean.length > 1) {
+            extractedTitle = clean;
+          }
+        }
+      }
+    } catch (e) {}
   }
 
   try {
@@ -52,6 +70,10 @@ app.get('/api/proxy', async (req, res) => {
 
     const data = await response.text();
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Sheet-Title');
+    if (extractedTitle) {
+      res.setHeader('X-Sheet-Title', encodeURIComponent(extractedTitle));
+    }
     res.send(data);
   } catch (err) {
     res.status(500).json({ error: 'Server proxy error', message: err.message });

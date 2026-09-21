@@ -28,6 +28,7 @@ class App {
     this.setupPWA();
     this.initClock();
     this.bindEvents();
+    await this.ui.checkNetworkStatus(true);
 
     try {
       await db.init();
@@ -62,8 +63,6 @@ class App {
       console.warn('Auto cleanup error:', e);
     }
   }
-
-  initClock() {
     const updateTime = () => {
       const clockEl = document.getElementById('clockTime');
       if (!clockEl) return;
@@ -209,11 +208,11 @@ class App {
     document.getElementById('securityPinForm')?.addEventListener('submit', (e) => this.verifyPinSubmit(e));
 
     // Master Sheet Cloud Settings Modal
-    document.getElementById('masterSheetBtn')?.addEventListener('click', () => this.openMasterModal());
-    document.getElementById('closeMasterModalBtn')?.addEventListener('click', () => this.closeMasterModal());
-    document.getElementById('cancelMasterModalBtn')?.addEventListener('click', () => this.closeMasterModal());
-    document.getElementById('masterSheetForm')?.addEventListener('submit', (e) => this.handleMasterSubmit(e));
-    document.getElementById('clearMasterBtn')?.addEventListener('click', () => this.clearMasterSheetSettings());
+    document.getElementById('masterSheetBtn')?.addEventListener('click', () => this.ui.openMasterModal());
+    document.getElementById('closeMasterModalBtn')?.addEventListener('click', () => this.ui.closeMasterModal());
+    document.getElementById('cancelMasterModalBtn')?.addEventListener('click', () => this.ui.closeMasterModal());
+    document.getElementById('masterSheetForm')?.addEventListener('submit', (e) => this.ui.handleMasterSubmit(e));
+    document.getElementById('clearMasterBtn')?.addEventListener('click', () => this.ui.clearMasterSheetSettings());
 
     // Sync Cloud Hero Button
     document.getElementById('syncCloudBtn')?.addEventListener('click', async () => {
@@ -224,7 +223,7 @@ class App {
         await this.ui.renderDashboard();
         alert('✅ Data berhasil disinkronkan dari Master Cloud!');
       } else {
-        this.openMasterModal();
+        this.ui.openMasterModal();
       }
       if (syncBtn) syncBtn.style.opacity = '1';
     });
@@ -243,6 +242,25 @@ class App {
       closeInstall();
       this.installPWA();
     });
+
+    // Network Status Modal Handlers
+    document.getElementById('dismissNetworkModalBtn')?.addEventListener('click', () => this.ui.hideNetworkModal());
+    document.getElementById('retryConnectionBtn')?.addEventListener('click', async () => {
+      const retryBtn = document.getElementById('retryConnectionBtn');
+      if (retryBtn) retryBtn.innerHTML = `<div class="spinner"></div> Memeriksa...`;
+      const isOk = await this.ui.checkNetworkStatus(true);
+      if (retryBtn) retryBtn.innerHTML = `Coba Lagi 🔄`;
+      if (isOk) {
+        this.ui.hideNetworkModal();
+        if (this.masterSheetUrl) {
+          await this.syncFromMasterSheet(this.masterSheetUrl);
+          await this.ui.renderDashboard();
+        }
+      }
+    });
+
+    window.addEventListener('offline', () => this.ui.checkNetworkStatus(false));
+    window.addEventListener('online', () => this.ui.hideNetworkModal());
 
     // Viewer Navigation & Search
     document.getElementById('backToDashboardBtn')?.addEventListener('click', () => this.viewer.showDashboardView());
@@ -358,22 +376,6 @@ class App {
         input.focus();
       }
     }
-  }
-
-  openMasterModal() {
-    this.ui.openMasterModal();
-  }
-
-  closeMasterModal() {
-    this.ui.closeMasterModal();
-  }
-
-  handleMasterSubmit(e) {
-    this.ui.handleMasterSubmit(e);
-  }
-
-  clearMasterSheetSettings() {
-    this.ui.clearMasterSheetSettings();
   }
 
   openAddModal() {
