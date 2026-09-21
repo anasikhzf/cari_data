@@ -37,48 +37,108 @@ export class DocumentParser {
   }
 
   /**
-   * Fetch and parse document data via Server-Side Proxy (/api/proxy)
+   * Fetch exact Google Sheet title from HTML page meta title
+   */
+  static async fetchGoogleSheetTitle(sheetId) {
+    try {
+      const pageUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`;
+      const res = await fetch(pageUrl);
+      if (res.ok) {
+        const html = await res.text();
+        const match = html.match(/<title>(.*?)<\/title>/i);
+        if (match && match[1]) {
+          const cleanTitle = match[1].replace(/- Google (Sheets|Drive|Dokumen)/gi, '').trim();
+          if (cleanTitle && !cleanTitle.toLowerCase().includes('google sheets') && cleanTitle.length > 1) {
+            return cleanTitle;
+          }
+        }
+      }
+    } catch (e) {
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`)}`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const match = html.match(/<title>(.*?)<\/title>/i);
+          if (match && match[1]) {
+            const cleanTitle = match[1].replace(/- Google (Sheets|Drive|Dokumen)/gi, '').trim();
+            if (cleanTitle && !cleanTitle.toLowerCase().includes('google sheets') && cleanTitle.length > 1) {
+              return cleanTitle;
+            }
+          }
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  /**
+   * Fetch and parse document data via Server-Side Proxy (/api/proxy) or Direct Fetch
    */
   static async parseFromUrl(rawUrl, customTitle = '', existingId = null) {
     let title = customTitle;
+
+    // Try auto-discovering real Google Sheet name if customTitle is blank
+    if (!title && rawUrl.includes('docs.google.com/spreadsheets')) {
+      const sheetIdMatch = rawUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (sheetIdMatch && sheetIdMatch[1]) {
+        const fetchedTitle = await this.fetchGoogleSheetTitle(sheetIdMatch[1]);
+        if (fetchedTitle) title = fetchedTitle;
+      }
+    }
+
     const b64Url = this.obfuscateUrl(rawUrl);
-
-    // Primary Server-Side Security Proxy URL
     const proxyEndpoint = `/api/proxy?b64=${encodeURIComponent(b64Url)}`;
+    let fetchedText = null;
 
+    // 1. Attempt Server-Side Proxy Fetch
     try {
-      // 1. Attempt Server-Side Proxy Fetch (Keeps Google Sheet link hidden from Network Inspector)
       const response = await fetch(proxyEndpoint);
       if (response.ok) {
         const text = await response.text();
-        if (!title) title = this.extractTitleFromUrl(rawUrl);
-        return this.parseText(text, title, rawUrl, existingId);
+        // Ensure proxy returned valid CSV text, not an HTML error page
+        if (text && !text.trim().toLowerCase().startsWith('<!doctype html') && !text.trim().toLowerCase().startsWith('<html')) {
+          fetchedText = text;
+        }
       }
-      throw new Error(`Server Proxy returned HTTP ${response.status}`);
-    } catch (serverProxyErr) {
-      console.warn('Server-Side Proxy unavailable, trying direct server fetch:', serverProxyErr);
+    } catch (err) {
+      console.warn('Server-Side Proxy unavailable, trying direct fetch:', err);
+    }
 
-      // 2. Direct fetch fallback for local preview / standalone mode
+    // 2. Direct fetch fallback if proxy unavailable or returned non-CSV
+    if (!fetchedText) {
       const targetUrl = this.normalizeUrl(rawUrl);
       try {
         const response = await fetch(targetUrl, { mode: 'cors' });
-        if (!response.ok) throw new Error(`Fetch status: ${response.status}`);
-        const text = await response.text();
-        if (!title) title = this.extractTitleFromUrl(rawUrl);
-        return this.parseText(text, title, rawUrl, existingId);
+        if (response.ok) {
+          const text = await response.text();
+          if (text && !text.trim().toLowerCase().startsWith('<!doctype html') && !text.trim().toLowerCase().startsWith('<html')) {
+            fetchedText = text;
+          }
+        }
       } catch (err) {
         try {
           const publicProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
           const response = await fetch(publicProxy);
-          if (!response.ok) throw new Error('Public proxy failed');
-          const text = await response.text();
-          if (!title) title = this.extractTitleFromUrl(rawUrl);
-          return this.parseText(text, title, rawUrl, existingId);
-        } catch (e) {
-          throw new Error(`Gagal mengunduh spreadsheet. Pastikan akses diset "Siapa saja yang memiliki link dapat melihat". (${e.message})`);
-        }
+          if (response.ok) {
+            const text = await response.text();
+            if (text && !text.trim().toLowerCase().startsWith('<!doctype html') && !text.trim().toLowerCase().startsWith('<html')) {
+              fetchedText = text;
+            }
+          }
+        } catch (e) {}
       }
     }
+
+    if (!fetchedText || fetchedText.trim().toLowerCase().startsWith('<!doctype html') || fetchedText.trim().toLowerCase().startsWith('<html')) {
+      throw new Error('Gagal membaca data spreadsheet. Pastikan akses Google Sheet sudah diset "Siapa saja yang memiliki link dapat melihat".');
+    }
+
+    if (!title) {
+      title = this.extractTitleFromUrl(rawUrl);
+    }
+
+    return this.parseText(fetchedText, title, rawUrl, existingId);
   }
 
   /**
@@ -95,7 +155,7 @@ export class DocumentParser {
 
     for (const row of indexDoc.rows) {
       const url = urlColIdx >= 0 ? row[urlColIdx] : row.find(c => c && c.includes('http'));
-      const name = nameColIdx >= 0 ? row[nameColIdx] : 'Dokumen Cloud';
+      const name = nameColIdx >= 0 ? row[nameColIdx] : '';
 
       if (url && url.startsWith('http')) {
         try {
@@ -135,8 +195,8 @@ export class DocumentParser {
    * Parse raw CSV/TSV text string into headers & row arrays
    */
   static parseText(text, title = 'Dokumen CSV', sourceUrl = '', existingId = null) {
-    if (!text || !text.trim()) {
-      throw new Error('Dokumen kosong atau format tidak sesuai.');
+    if (!text || !text.trim() || text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html')) {
+      throw new Error('Dokumen kosong atau format tidak sesuai (bukan CSV/Spreadsheet).');
     }
 
     const firstLine = text.split('\n')[0] || '';
@@ -149,13 +209,16 @@ export class DocumentParser {
 
     const rows = this.parseCSV(text, delimiter);
 
-    if (rows.length === 0) {
-      throw new Error('Data spreadsheet tidak ditemukan.');
+    // Filter out any HTML lines or empty rows
+    const validRows = rows.filter(r => r.length > 0 && !r.some(c => c && (c.includes('<!DOCTYPE') || c.includes('<html'))));
+
+    if (validRows.length === 0) {
+      throw new Error('Data spreadsheet tidak ditemukan atau file kosong.');
     }
 
-    const rawHeaders = rows[0];
+    const rawHeaders = validRows[0];
     const headers = rawHeaders.map((h, idx) => (h && h.trim()) ? h.trim() : `Kolom ${idx + 1}`);
-    const dataRows = rows.slice(1).filter(r => r.some(cell => cell && cell.trim() !== ''));
+    const dataRows = validRows.slice(1).filter(r => r.some(cell => cell && cell.trim() !== ''));
 
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1'];
     const badgeColor = colors[Math.abs(this.hashCode(title)) % colors.length];
