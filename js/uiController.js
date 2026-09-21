@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { DocumentParser } from './parser.js';
+import { CONFIG } from '../data/config.js';
 
 export class UIController {
   constructor(app) {
@@ -212,7 +213,26 @@ export class UIController {
   async confirmDeleteDocument(id, name, pinHash) {
     const action = async () => {
       if (confirm(`Apakah Anda yakin ingin menghapus dokumen "${name}"?`)) {
+        const doc = await db.getDocumentById(id);
         await db.deleteDocument(id);
+
+        // Auto-delete from Master Google Sheet if Webhook URL is configured
+        if (CONFIG && CONFIG.MASTER_WEBHOOK_URL) {
+          try {
+            fetch(CONFIG.MASTER_WEBHOOK_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'delete',
+                id: id,
+                name: name,
+                url: doc ? doc.sourceUrl : ''
+              })
+            }).catch(() => {});
+          } catch (e) {}
+        }
+
         await this.renderDashboard();
       }
     };

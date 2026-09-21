@@ -410,6 +410,23 @@ class App {
 
       await db.saveDocument(docData);
 
+      // Auto-write to Master Google Sheet if Webhook URL is configured
+      if (CONFIG.MASTER_WEBHOOK_URL) {
+        try {
+          fetch(CONFIG.MASTER_WEBHOOK_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: docData.id,
+              name: docData.name,
+              url: url,
+              color: docData.badgeColor
+            })
+          }).catch(() => {});
+        } catch (e) {}
+      }
+
       this.closeAddModal();
       await this.ui.renderDashboard();
       this.openDocument(docData.id);

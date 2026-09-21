@@ -1,73 +1,95 @@
 # 📊 Panduan Pengaturan Google Sheets Sebagai Database Terpusat (CariData)
 
-Dokumen ini berisi panduan langkah-demi-langkah untuk menjadikan **Google Sheets** sebagai **Database Cloud Terpusat**. Dengan metode ini, semua dokumen dan data yang dimasukkan ke Google Sheets akan **otomatis tersinkronisasi di seluruh HP, Tablet, dan Komputer** yang membuka web PWA **CariData**.
+Dokumen ini berisi panduan untuk menjadikan **Google Sheets** sebagai **Database Cloud Terpusat**. 
+
+Dengan fitur ini, data spreadsheet dapat **otomatis tersinkronisasi di seluruh HP, Tablet, dan Komputer** yang membuka web PWA **CariData**.
+
+---
+
+## ⚡ Cara Kerja Sinkronisasi Terpusat
+
+Ada **2 Cara** memasukkan dokumen agar muncul di semua perangkat:
+
+### 1. Manual via Google Sheets (Oleh Admin)
+Admin menambahkan baris link spreadsheet baru langsung pada tab `Daftar Dokumen` di Google Sheets Master.
+
+### 2. Otomatis via Aplikasi (Oleh Pengguna di HP)
+Saat siapa pun menekan tombol **"+ Tambah Link Dokumen"** di dalam aplikasi CariData, sistem akan **otomatis mengirim & menambahkan baris baru ke Master Google Sheet** (menggunakan Google Apps Script Webhook).
 
 ---
 
 ## 🚀 Langkah 1: Buat Master Spreadsheet di Google Drive
 
 1. Buka [Google Sheets](https://sheets.google.com) dan buat **Spreadsheet Baru**.
-2. Beri nama file Google Sheets Anda, misalnya: `CariData Master Database`.
-
----
-
-## 📋 Langkah 2: Buat Lembar Kerja (Tab) Index "Daftar Dokumen"
-
-Pada Tab pertama (beri nama tab: `Daftar Dokumen`), buat struktur kolom pada **Baris 1** seperti berikut:
+2. Beri nama file Google Sheets Anda: `CariData Master Database`.
+3. Buat header pada **Baris 1** di tab pertama (`Daftar Dokumen`):
 
 | A (ID Dokumen) | B (Nama Dokumen) | C (Link Spreadsheet / CSV) | D (Warna Badge) | E (Keterangan) |
 | :--- | :--- | :--- | :--- | :--- |
-| `DOC-001` | Data Stok barang Gudang | `https://docs.google.com/spreadsheets/d/...` | `#2563eb` | Data inventaris fisik |
-| `DOC-002` | Daftar Harga Layanan | `https://docs.google.com/spreadsheets/d/...` | `#059669` | Pricelist terbaru 2026 |
-
-> **Catatan Struktur Kolom**:
-> - **Baris 1** wajib berisi nama header (`ID Dokumen`, `Nama Dokumen`, `Link Spreadsheet`, dst).
-> - **Baris 2 dst** berisi daftar spreadsheet yang ingin ditampilkan di aplikasi CariData semua HP.
+| `DOC-001` | Data Stok barang Gudang | `https://docs.google.com/spreadsheets/d/...` | `#2563eb` | Data inventaris |
 
 ---
 
-## 📄 Langkah 3: Menyiapkan Isi Dokumen Data (Spreadsheet Data)
-
-Untuk setiap spreadsheet data (misalnya Google Sheets "Data Stok barang Gudang"):
-1. Pastikan **Baris 1** adalah **Header Kolom** (misal: `Kode`, `Nama Barang`, `Kategori`, `Stok`, `Harga`).
-2. **Baris 2 ke bawah** adalah data baris yang ingin dicari oleh pengguna.
-
----
-
-## 🔓 Langkah 4: Membuka Akses Publik ("Siapa saja yang memiliki link")
-
-Agar aplikasi CariData di semua HP dapat membaca data tanpa perlu login akun Google:
+## 🔓 Langkah 2: Membuka Akses Lihat ("Siapa saja yang memiliki link")
 
 1. Di pojok kanan atas Google Sheets, klik tombol **Bagikan (Share)**.
-2. Pada bagian **Akses Umum (General Access)**, ubah dari *Dibatasi (Restricted)* menjadi **"Siapa saja yang memiliki link" (Anyone with the link)**.
-3. Pastikan perannya disetel sebagai **Pengakses Lihat Saja (Viewer)**.
-4. Klik **Salin Link (Copy Link)**.
+2. Pada bagian **Akses Umum (General Access)**, ubah dari *Dibatasi (Restricted)* menjadi **"Siapa saja yang memiliki link"**.
+3. Klik **Salin Link (Copy Link)**.
 
 ---
 
-## 🔗 Langkah 5: Hubungkan Link Master Spreadsheet ke Aplikasi
+## 🤖 Langkah 3 (Opsional): Aktifkan Otomatis Tambah via Aplikasi (Google Apps Script)
 
-Ada 2 Cara Menghubungkan Link ke Aplikasi:
+Agar tombol **"+ Tambah Link Dokumen"** di aplikasi HP bisa **otomatis menulis ke Google Sheets Master**:
 
-### **Cara A (Pengaturan di Aplikasi CariData)**:
-1. Buka aplikasi **CariData** di HP / Laptop.
-2. Klik tombol **"⚙️ Set Database Cloud"** di bagian atas.
-3. Tempelkan (*paste*) link Master Google Sheet yang telah disalin.
-4. Klik **Simpan & Sinkronkan**. Seluruh data dokumen akan langsung tampil di semua HP!
+1. Di Google Sheets Master Anda, klik menu **Ekstensi (Extensions)** &rarr; **Apps Script**.
+2. Hapus semua kode yang ada, lalu tempelkan (*paste*) kode berikut:
 
-### **Cara B (Kustomisasi Bawaan Kode Web `data/config.js`)**:
-Buka file `data/config.js` di repositori web ini, lalu isi variabel `MASTER_SHEET_URL` dengan link Google Sheet Anda:
+```javascript
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Daftar Dokumen") || ss.getSheets()[0];
+    
+    var docId = data.id || ("DOC-" + Math.floor(Math.random() * 8999 + 1000));
+    var name = data.name || "Dokumen Baru";
+    var url = data.url || "";
+    var color = data.color || "#2563eb";
+    var note = data.note || "Ditambahkan via Aplikasi HP";
+    
+    sheet.appendRow([docId, name, url, color, note]);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", id: docId }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput("CariData Webhook API Active");
+}
+```
+
+3. Klik tombol **Terapkan (Deploy)** &rarr; **Terapkan Sebagai Aplikasi Web (New Deployment)**.
+4. Pada **Siapa yang memiliki akses (Who has access)**, pilih **"Siapa Saja (Anyone)"**.
+5. Klik **Terapkan (Deploy)** dan salin **URL Aplikasi Web** yang dihasilkan.
+6. Tempelkan URL tersebut ke variabel `MASTER_WEBHOOK_URL` di file `data/config.js` web ini.
+
+---
+
+## 🔗 Langkah 4: Hubungkan Master Spreadsheet ke Kode Web (`data/config.js`)
+
+Buka file `data/config.js` di repositori web ini:
 
 ```javascript
 export const CONFIG = {
-  // Masukkan link Google Sheets Master Anda di sini:
-  MASTER_SHEET_URL: "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit?usp=sharing"
+  // Link Google Sheets Master untuk membaca daftar dokumen:
+  MASTER_SHEET_URL: "https://docs.google.com/spreadsheets/d/1w8V3UZ7U7ng14hOM4mOy48qgwbIU3XYHda3jVgtHE_o/edit?usp=sharing",
+  
+  // Link Webhook Apps Script untuk otomatis menulis saat Tambah Dokumen di HP (Opsional):
+  MASTER_WEBHOOK_URL: ""
 };
 ```
-
----
-
-## ⚡ Cara Kerja Sinkronisasi Terpusat
-- **Menambah Dokumen**: Cukup tambahkan baris baru di Tab `Daftar Dokumen` pada Google Sheets Master Anda.
-- **Mengedit Data Baris**: Edit data langsung di Google Sheets. Aplikasi di HP penginstal akan otomatis menampilkan data terbaru saat dibuka atau menekan tombol **Segarkan (Refresh)**.
-- **Menghapus Dokumen**: Hapus baris dokumen dari Google Sheets Master.
