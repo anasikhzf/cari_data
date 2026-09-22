@@ -327,7 +327,7 @@ export class UIController {
         saveBtn.innerHTML = `<div class="spinner"></div> Menyinkronkan...`;
       }
       this.app.masterSheetUrl = url;
-      localStorage.setItem('caridata_master_sheet_url', url);
+      this.app.masterSheetUrl = url;
 
       await this.app.syncFromMasterSheet(url);
       this.closeMasterModal();
@@ -346,7 +346,6 @@ export class UIController {
   async clearMasterSheetSettings() {
     if (confirm('Apakah Anda yakin ingin menghapus tautan Master Google Sheet Cloud dari perangkat ini?')) {
       this.app.masterSheetUrl = '';
-      localStorage.removeItem('caridata_master_sheet_url');
       this.closeMasterModal();
       alert('Tautan Master Sheet berhasil direset.');
     }

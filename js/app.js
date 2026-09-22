@@ -12,7 +12,7 @@ class App {
     this.activeDocument = null;
     this.currentFolderId = null;
     this.currentFolder = null;
-    this.masterSheetUrl = localStorage.getItem(CONFIG.STORAGE_KEY_MASTER_URL) || CONFIG.MASTER_SHEET_URL || '';
+    this.masterSheetUrl = CONFIG.MASTER_SHEET_URL || '';
 
     this.pendingPinCallback = null;
     this.pendingPinTargetHash = null;
@@ -437,7 +437,6 @@ class App {
       if (docs && docs.length > 0) {
         await db.clearAllDocuments();
         for (const doc of docs) {
-          doc.folderId = this.currentFolderId;
           await db.saveDocument(doc);
         }
         await this.ui.renderDashboard();
@@ -473,6 +472,8 @@ class App {
 
       await db.saveDocument(docData);
 
+      const currentFolderName = this.currentFolder ? this.currentFolder.name : '';
+
       // Auto-write to Master Google Sheet if Webhook URL is configured
       if (CONFIG.MASTER_WEBHOOK_URL) {
         try {
@@ -484,7 +485,8 @@ class App {
               id: docData.id,
               name: docData.name,
               url: url,
-              color: docData.badgeColor
+              color: docData.badgeColor,
+              note: currentFolderName || ''
             })
           }).catch(() => {});
         } catch (e) {}

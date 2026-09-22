@@ -55,27 +55,8 @@ class DocumentDB {
   }
 
   async saveDocument(doc) {
-    if (doc.sourceUrl) {
-      const sheetIdMatch = doc.sourceUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      const docSheetId = sheetIdMatch && sheetIdMatch[1] ? sheetIdMatch[1] : null;
-
-      // Find if document already exists by sourceUrl or sheetId
-      for (const [existingId, existingDoc] of this.documents.entries()) {
-        const existingMatch = existingDoc.sourceUrl ? existingDoc.sourceUrl.match(/\/d\/([a-zA-Z0-9-_]+)/) : null;
-        const existingSheetId = existingMatch && existingMatch[1] ? existingMatch[1] : null;
-
-        if (
-          (docSheetId && existingSheetId && docSheetId === existingSheetId) ||
-          (existingDoc.sourceUrl && existingDoc.sourceUrl === doc.sourceUrl)
-        ) {
-          doc.id = existingId;
-          break;
-        }
-      }
-    }
-
     if (!doc.id) {
-      doc.id = 'doc_' + Date.now();
+      doc.id = 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
     }
     if (!doc.lastAccessedAt) {
       doc.lastAccessedAt = new Date().toISOString();
@@ -134,6 +115,39 @@ class DocumentDB {
       }
     }
     return this.folders.delete(id);
+  }
+
+  async getOrCreateFolderByName(name) {
+    if (!name || !name.trim()) return null;
+    const cleanName = name.trim();
+
+    for (const folder of this.folders.values()) {
+      if (folder.name.toLowerCase() === cleanName.toLowerCase()) {
+        return folder.id;
+      }
+    }
+
+    const folderId = 'folder_' + Math.abs(this.hashCode(cleanName));
+    const folder = {
+      id: folderId,
+      name: cleanName,
+      pinHash: null,
+      parentId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString()
+    };
+    await this.saveFolder(folder);
+    return folderId;
+  }
+
+  hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash;
   }
 
   async performAutoCleanup(maxInactiveDays = 30) {

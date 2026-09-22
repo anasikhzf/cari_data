@@ -5,7 +5,7 @@ export const CONFIG = {
   MASTER_SHEET_URL: "https://docs.google.com/spreadsheets/d/1w8V3UZ7U7ng14hOM4mOy48qgwbIU3XYHda3jVgtHE_o/edit?usp=sharing",
 
   // Optional Google Apps Script Webhook URL for auto-writing when adding documents via app UI
-  MASTER_WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbzDKrM_7zNJADmrFxuH9dQfyZ792xtikm-eEKb132wMgolccOYMpnynV0sL_BvEMyY/exec",
+  MASTER_WEBHOOK_URL: "https://script.google.com/macros/s/AKfycby3DqqnLUS1GUrt3JiwliUNS1nm-qQh7jbWL2gblQbBPXuwcIHt5crKf-kg5U-mNmw/exec",
 
   // Storage key for user dynamic Master Sheet URL
   STORAGE_KEY_MASTER_URL: "caridata_master_sheet_url",

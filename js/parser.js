@@ -1,6 +1,4 @@
-/**
- * Parser utility with Server-Side Proxy & Title Auto-Discovery Integration.
- */
+import { db } from './db.js';
 
 export class DocumentParser {
   /**
@@ -177,33 +175,52 @@ export class DocumentParser {
   static async parseMasterIndexSheet(masterUrl) {
     const indexDoc = await this.parseFromUrl(masterUrl, 'Master Database');
     const documents = [];
-    const seenUrls = new Set();
 
     const headers = indexDoc.headers.map(h => h.toLowerCase());
+    const idColIdx = headers.findIndex(h => h.includes('id'));
     const nameColIdx = headers.findIndex(h => h.includes('nama') || h.includes('title') || h.includes('dokumen'));
     const urlColIdx = headers.findIndex(h => h.includes('link') || h.includes('url') || h.includes('spreadsheet') || h.includes('csv'));
     const colorColIdx = headers.findIndex(h => h.includes('warna') || h.includes('color') || h.includes('badge'));
+    const folderColIdx = headers.findIndex(h => h.includes('folder') || h.includes('kategori') || h.includes('kelompok'));
+    const pinColIdx = headers.findIndex(h => h.includes('pin') || h.includes('kunci') || h.includes('password'));
+    const timeColIdx = headers.findIndex(h => h.includes('waktu') || h.includes('tanggal') || h.includes('upload') || h.includes('time'));
 
-    for (const row of indexDoc.rows) {
+    for (let i = 0; i < indexDoc.rows.length; i++) {
+      const row = indexDoc.rows[i];
       const url = urlColIdx >= 0 ? row[urlColIdx] : row.find(c => c && c.includes('http'));
+      const rawId = idColIdx >= 0 ? row[idColIdx] : '';
       const rawName = nameColIdx >= 0 ? row[nameColIdx] : '';
+      const rawFolder = folderColIdx >= 0 ? row[folderColIdx] : '';
+      const rawPin = pinColIdx >= 0 ? row[pinColIdx] : '';
+      const rawTime = timeColIdx >= 0 ? row[timeColIdx] : '';
+
+      const cleanId = rawId && rawId.trim() ? rawId.trim() : `DOC-${i + 1}-${Math.floor(Math.random() * 8999 + 1000)}`;
       const cleanName = rawName ? rawName.trim() : '';
+      const cleanFolder = rawFolder ? rawFolder.trim() : '';
+      const cleanPin = rawPin ? rawPin.trim() : null;
 
       if (url && url.startsWith('http')) {
-        // Extract sheetId or normalized URL for strict deduplication
-        const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        const urlKey = sheetIdMatch && sheetIdMatch[1] ? sheetIdMatch[1] : url.trim().toLowerCase();
-
-        if (seenUrls.has(urlKey)) {
-          continue; // Skip duplicate document URL
-        }
-        seenUrls.add(urlKey);
-
         try {
-          const doc = await this.parseFromUrl(url, cleanName);
-          if (colorColIdx >= 0 && row[colorColIdx]) {
-            doc.badgeColor = row[colorColIdx];
+          const doc = await this.parseFromUrl(url, cleanName, cleanId);
+          doc.id = cleanId;
+
+          if (colorColIdx >= 0 && row[colorColIdx] && row[colorColIdx].trim()) {
+            doc.badgeColor = row[colorColIdx].trim();
           }
+
+          if (cleanFolder) {
+            const folderId = await db.getOrCreateFolderByName(cleanFolder);
+            doc.folderId = folderId;
+          }
+
+          if (cleanPin) {
+            doc.pinHash = cleanPin;
+          }
+
+          if (rawTime && rawTime.trim()) {
+            doc.updatedAt = rawTime.trim();
+          }
+
           documents.push(doc);
         } catch (e) {
           console.warn('Failed to parse sub-document from Master Index:', url, e);
