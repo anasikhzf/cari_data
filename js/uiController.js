@@ -351,4 +351,28 @@ export class UIController {
       alert('Tautan Master Sheet berhasil direset.');
     }
   }
+
+  /* -------------------------------------------------------------------------- */
+  /* Global Loading Overlay & Toast Notifications                               */
+  /* -------------------------------------------------------------------------- */
+  showLoading(text = 'Memuat data dari Google Sheets...') {
+    const overlay = document.getElementById('globalLoadingOverlay');
+    const textEl = document.getElementById('loadingOverlayText');
+    if (textEl) textEl.textContent = text;
+    if (overlay) overlay.classList.add('active');
+  }
+
+  hideLoading() {
+    document.getElementById('globalLoadingOverlay')?.classList.remove('active');
+  }
+
+  showToast(message, duration = 2000) {
+    const toast = document.getElementById('toastNotification');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('active');
+    setTimeout(() => {
+      toast.classList.remove('active');
+    }, duration);
+  }
 }

@@ -16,6 +16,7 @@ class App {
 
     this.pendingPinCallback = null;
     this.pendingPinTargetHash = null;
+    this.lastBackPressTime = 0;
 
     this.ui = new UIController(this);
     this.viewer = new ViewerController(this);
@@ -28,15 +29,18 @@ class App {
     this.setupPWA();
     this.initClock();
     this.bindEvents();
+    this.setupAutoSync();
+    this.setupHistoryAndBackHandling();
     await this.ui.checkNetworkStatus(true);
 
     try {
+      this.ui.showLoading('Menyinkronkan data dari Google Sheets...');
       await db.init();
-      await this.runAutoCleanup();
       await this.handleUrlQueryImport();
       
-      if (this.masterSheetUrl) {
-        await this.syncFromMasterSheet(this.masterSheetUrl);
+      const targetMasterUrl = this.masterSheetUrl || CONFIG.MASTER_SHEET_URL;
+      if (targetMasterUrl) {
+        await this.syncFromMasterSheet(targetMasterUrl, true);
       } else {
         await this.ensureSampleData();
       }
@@ -44,23 +48,8 @@ class App {
       await this.ui.renderDashboard();
     } catch (err) {
       console.error('Initialization error:', err);
-    }
-  }
-
-  async runAutoCleanup() {
-    try {
-      const result = await db.performAutoCleanup(30);
-      const totalDeleted = result.deletedDocsCount + result.deletedFoldersCount;
-      if (totalDeleted > 0) {
-        const banner = document.getElementById('cleanupNoticeBanner');
-        const textEl = document.getElementById('cleanupNoticeText');
-        if (banner && textEl) {
-          textEl.textContent = `🧹 Pembersihan Otomatis: ${totalDeleted} dokumen/folder yang tidak pernah dibuka selama 1 bulan telah dihapus secara otomatis.`;
-          banner.classList.remove('hidden');
-        }
-      }
-    } catch (e) {
-      console.warn('Auto cleanup error:', e);
+    } finally {
+      setTimeout(() => this.ui.hideLoading(), 200);
     }
   }
 
@@ -135,21 +124,6 @@ class App {
     }
   }
 
-  async syncFromMasterSheet(masterUrl) {
-    if (!masterUrl) return;
-    try {
-      const docs = await DocumentParser.parseMasterIndexSheet(masterUrl);
-      if (docs && docs.length > 0) {
-        for (const doc of docs) {
-          doc.folderId = this.currentFolderId;
-          await db.saveDocument(doc);
-        }
-      }
-    } catch (err) {
-      console.warn('Master sheet sync error:', err);
-    }
-  }
-
   async handleUrlQueryImport() {
     const params = new URLSearchParams(window.location.search);
     let docUrl = params.get('url') || params.get('sheet') || '';
@@ -220,8 +194,9 @@ class App {
     document.getElementById('syncCloudBtn')?.addEventListener('click', async () => {
       const syncBtn = document.getElementById('syncCloudBtn');
       if (syncBtn) syncBtn.style.opacity = '0.5';
-      if (this.masterSheetUrl) {
-        await this.syncFromMasterSheet(this.masterSheetUrl);
+      const targetMasterUrl = this.masterSheetUrl || CONFIG.MASTER_SHEET_URL;
+      if (targetMasterUrl) {
+        await this.syncFromMasterSheet(targetMasterUrl);
         await this.ui.renderDashboard();
         alert('✅ Data berhasil disinkronkan dari Master Cloud!');
       } else {
@@ -254,8 +229,9 @@ class App {
       if (retryBtn) retryBtn.innerHTML = `Coba Lagi 🔄`;
       if (isOk) {
         this.ui.hideNetworkModal();
-        if (this.masterSheetUrl) {
-          await this.syncFromMasterSheet(this.masterSheetUrl);
+        const targetMasterUrl = this.masterSheetUrl || CONFIG.MASTER_SHEET_URL;
+        if (targetMasterUrl) {
+          await this.syncFromMasterSheet(targetMasterUrl);
           await this.ui.renderDashboard();
         }
       }
@@ -339,7 +315,7 @@ class App {
     await this.ui.renderDashboard();
   }
 
-  async navigateToFolder(folderId) {
+  async navigateToFolder(folderId, pushHistory = true) {
     if (folderId) {
       const folder = await db.getFolderById(folderId);
       if (folder && folder.pinHash) {
@@ -347,6 +323,9 @@ class App {
           this.currentFolderId = folderId;
           this.currentFolder = folder;
           await this.ui.renderDashboard();
+          if (pushHistory) {
+            history.pushState({ page: 'folder', folderId }, '', window.location.href);
+          }
         });
         return;
       }
@@ -357,6 +336,9 @@ class App {
       this.currentFolder = null;
     }
     await this.ui.renderDashboard();
+    if (pushHistory) {
+      history.pushState({ page: 'dashboard', folderId: null }, '', window.location.href);
+    }
   }
 
   verifyPinSubmit(e) {
@@ -391,15 +373,91 @@ class App {
     if (form) form.reset();
   }
 
+  setupHistoryAndBackHandling() {
+    if (!history.state) {
+      history.replaceState({ page: 'dashboard', folderId: null }, '', window.location.href);
+    }
+
+    window.addEventListener('popstate', (e) => {
+      const viewerContainer = document.getElementById('documentViewerContainer');
+      const isViewerVisible = viewerContainer && !viewerContainer.classList.contains('hidden');
+
+      if (isViewerVisible) {
+        // Return to dashboard/folder without closing the app
+        this.viewer.showDashboardView(false);
+        return;
+      }
+
+      if (this.currentFolderId) {
+        // Return to home root folder without closing the app
+        this.navigateToFolder(null, false);
+        return;
+      }
+
+      // On root home dashboard: require double press within 2s to exit app
+      const now = Date.now();
+      if (now - this.lastBackPressTime < 2000) {
+        // Allow exit / allow browser back pop
+      } else {
+        this.lastBackPressTime = now;
+        history.pushState({ page: 'dashboard', folderId: null }, '', window.location.href);
+        this.ui.showToast('📱 Tekan sekali lagi untuk keluar dari aplikasi');
+      }
+    });
+  }
+
+  setupAutoSync() {
+    // Real-time background sync interval (every 30 seconds)
+    const syncIntervalMs = CONFIG.AUTO_SYNC_INTERVAL_MS || 30000;
+    setInterval(async () => {
+      const targetMasterUrl = this.masterSheetUrl || CONFIG.MASTER_SHEET_URL;
+      if (targetMasterUrl && navigator.onLine) {
+        await this.syncFromMasterSheet(targetMasterUrl, true);
+      }
+    }, syncIntervalMs);
+
+    // Auto-sync when user switches back to the application window/tab
+    document.addEventListener('visibilitychange', async () => {
+      if (!document.hidden && navigator.onLine) {
+        const targetMasterUrl = this.masterSheetUrl || CONFIG.MASTER_SHEET_URL;
+        if (targetMasterUrl) {
+          await this.syncFromMasterSheet(targetMasterUrl, true);
+        }
+      }
+    });
+  }
+
+  async syncFromMasterSheet(masterUrl, silent = false) {
+    if (!masterUrl) return;
+    if (!silent) {
+      this.ui.showLoading('Menyinkronkan data dari Google Sheets...');
+    }
+    try {
+      const docs = await DocumentParser.parseMasterIndexSheet(masterUrl);
+      if (docs && docs.length > 0) {
+        await db.clearAllDocuments();
+        for (const doc of docs) {
+          doc.folderId = this.currentFolderId;
+          await db.saveDocument(doc);
+        }
+        await this.ui.renderDashboard();
+      }
+    } catch (err) {
+      console.warn('Master sheet sync error:', err);
+    } finally {
+      if (!silent) {
+        setTimeout(() => this.ui.hideLoading(), 200);
+      }
+    }
+  }
+
   async handleAddDocumentSubmit(e) {
     e.preventDefault();
     const urlInput = document.getElementById('docUrlInput');
-    const titleInput = document.getElementById('docTitleInput');
     const pinInput = document.getElementById('docPinInput');
     const submitBtn = document.getElementById('saveDocBtn');
 
     const url = urlInput ? urlInput.value.trim() : '';
-    const customTitle = titleInput ? titleInput.value.trim() : '';
     const pin = pinInput ? pinInput.value.trim() : '';
 
     if (!url) return;
@@ -407,8 +465,9 @@ class App {
     try {
       submitBtn.disabled = true;
       submitBtn.innerHTML = `<div class="spinner"></div> Mengunduh...`;
+      this.ui.showLoading('Mengunduh & memproses spreadsheet baru...');
 
-      const docData = await DocumentParser.parseFromUrl(url, customTitle);
+      const docData = await DocumentParser.parseFromUrl(url);
       docData.folderId = this.currentFolderId;
       docData.pinHash = pin || null;
 
@@ -439,6 +498,7 @@ class App {
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML = `Simpan Dokumen`;
+      setTimeout(() => this.ui.hideLoading(), 200);
     }
   }
 
@@ -450,6 +510,8 @@ class App {
     const refreshBtn = document.getElementById('refreshCurrentDocBtn');
     try {
       if (refreshBtn) refreshBtn.style.opacity = '0.5';
+      this.ui.showLoading('Memperbarui data live dari Google Sheets...');
+
       const updatedDoc = await DocumentParser.parseFromUrl(
         this.activeDocument.sourceUrl,
         this.activeDocument.name,
@@ -471,6 +533,7 @@ class App {
       alert(`Tidak dapat menyegarkan data live:\n${err.message}`);
     } finally {
       if (refreshBtn) refreshBtn.style.opacity = '1';
+      setTimeout(() => this.ui.hideLoading(), 200);
     }
   }
 

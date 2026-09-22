@@ -10,67 +10,84 @@ export class ViewerController {
   /* -------------------------------------------------------------------------- */
   /* Document Viewer & Search Controller                                        */
   /* -------------------------------------------------------------------------- */
-  async openDocument(id) {
-    let doc = await db.getDocumentById(id);
-    if (!doc) {
-      alert('Dokumen tidak ditemukan.');
-      return;
-    }
-
-    const loadDocView = () => {
-      this.app.activeDocument = doc;
-      searchEngine.setDocument(doc);
-
-      document.getElementById('dashboardView')?.classList.add('hidden');
-      document.getElementById('documentViewerContainer')?.classList.remove('hidden');
-
-      const titleEl = document.getElementById('viewerDocTitle');
-      if (titleEl) titleEl.textContent = doc.name;
-
-      const select = document.getElementById('columnFilterSelect');
-      if (select) {
-        select.innerHTML = `<option value="-1">Semua Kolom</option>` +
-          doc.headers.map((h, idx) => `<option value="${idx}">Kolom: ${h}</option>`).join('');
+  async openDocument(id, pushHistory = true) {
+    this.app.ui.showLoading('Membuka spreadsheet...');
+    try {
+      let doc = await db.getDocumentById(id);
+      if (!doc) {
+        alert('Dokumen tidak ditemukan.');
+        return;
       }
 
-      const searchInput = document.getElementById('searchInput');
-      if (searchInput) searchInput.value = '';
-      document.getElementById('searchClearBtn')?.classList.remove('active');
+      const loadDocView = () => {
+        this.app.activeDocument = doc;
+        searchEngine.setDocument(doc);
 
-      this.renderTableHeader(doc.headers);
-      this.handleSearch();
+        document.getElementById('dashboardView')?.classList.add('hidden');
+        document.getElementById('documentViewerContainer')?.classList.remove('hidden');
 
-      if (doc.sourceUrl && doc.sourceUrl.startsWith('http')) {
-        DocumentParser.parseFromUrl(doc.sourceUrl, doc.name, doc.id)
-          .then(async (freshDoc) => {
-            freshDoc.folderId = doc.folderId;
-            freshDoc.pinHash = doc.pinHash;
-            if (freshDoc.rowCount !== doc.rowCount || freshDoc.updatedAt !== doc.updatedAt) {
-              await db.saveDocument(freshDoc);
-              if (this.app.activeDocument && this.app.activeDocument.id === doc.id) {
-                this.app.activeDocument = freshDoc;
-                searchEngine.setDocument(freshDoc);
-                if (titleEl) titleEl.textContent = freshDoc.name;
-                this.handleSearch();
+        if (pushHistory) {
+          history.pushState({ page: 'viewer', docId: id }, '', window.location.href);
+        }
+
+        const titleEl = document.getElementById('viewerDocTitle');
+        if (titleEl) titleEl.textContent = doc.name;
+
+        const select = document.getElementById('columnFilterSelect');
+        if (select) {
+          select.innerHTML = `<option value="-1">Semua Kolom</option>` +
+            doc.headers.map((h, idx) => `<option value="${idx}">Kolom: ${h}</option>`).join('');
+        }
+
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+        document.getElementById('searchClearBtn')?.classList.remove('active');
+
+        this.renderTableHeader(doc.headers);
+        this.handleSearch();
+
+        if (doc.sourceUrl && doc.sourceUrl.startsWith('http')) {
+          DocumentParser.parseFromUrl(doc.sourceUrl, doc.name, doc.id)
+            .then(async (freshDoc) => {
+              freshDoc.folderId = doc.folderId;
+              freshDoc.pinHash = doc.pinHash;
+              if (freshDoc.rowCount !== doc.rowCount || freshDoc.updatedAt !== doc.updatedAt) {
+                await db.saveDocument(freshDoc);
+                if (this.app.activeDocument && this.app.activeDocument.id === doc.id) {
+                  this.app.activeDocument = freshDoc;
+                  searchEngine.setDocument(freshDoc);
+                  if (titleEl) titleEl.textContent = freshDoc.name;
+                  this.handleSearch();
+                }
               }
-            }
-          })
-          .catch(() => {});
-      }
-    };
+            })
+            .catch(() => {});
+        }
+      };
 
-    if (doc.pinHash) {
-      this.app.ui.requestPinAuth(doc.name, doc.pinHash, loadDocView);
-    } else {
-      loadDocView();
+      if (doc.pinHash) {
+        this.app.ui.requestPinAuth(doc.name, doc.pinHash, loadDocView);
+      } else {
+        loadDocView();
+      }
+    } finally {
+      setTimeout(() => this.app.ui.hideLoading(), 150);
     }
   }
 
-  showDashboardView() {
+  showDashboardView(pushHistory = true) {
     document.getElementById('documentViewerContainer')?.classList.add('hidden');
     document.getElementById('dashboardView')?.classList.remove('hidden');
     this.app.activeDocument = null;
     this.app.ui.renderDashboard();
+
+    if (pushHistory) {
+      if (this.app.currentFolderId) {
+        history.pushState({ page: 'folder', folderId: this.app.currentFolderId }, '', window.location.href);
+      } else {
+        history.pushState({ page: 'dashboard' }, '', window.location.href);
+      }
+    }
   }
 
   renderTableHeader(headers) {

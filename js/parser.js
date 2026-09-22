@@ -38,20 +38,44 @@ export class DocumentParser {
    * Fetch exact Google Sheet title via CORS proxy fallback
    */
   static async fetchGoogleSheetTitle(sheetId) {
+    const targetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`;
+
+    // 1. AllOrigins JSON API Proxy (100% Reliable Cross-Origin CORS)
     try {
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`)}`;
-      const res = await fetch(proxyUrl);
+      const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
       if (res.ok) {
-        const html = await res.text();
-        const match = html.match(/<title>(.*?)<\/title>/i);
+        const data = await res.json();
+        const html = data.contents || '';
+        const match = html.match(/<title>(.*?)<\/title>/i) || html.match(/meta property="og:title" content="(.*?)"/i);
         if (match && match[1]) {
           const cleanTitle = match[1].replace(/- Google (Sheets|Drive|Dokumen)/gi, '').trim();
-          if (cleanTitle && !cleanTitle.toLowerCase().includes('google sheets') && cleanTitle.length > 1) {
+          if (
+            cleanTitle &&
+            !cleanTitle.toLowerCase().includes('google sheets') &&
+            !/^doc[_-]/i.test(cleanTitle) &&
+            cleanTitle.length > 1
+          ) {
             return cleanTitle;
           }
         }
       }
     } catch (e) {}
+
+    // 2. Direct fetch fallback
+    try {
+      const res = await fetch(targetUrl, { mode: 'cors' });
+      if (res.ok) {
+        const html = await res.text();
+        const match = html.match(/<title>(.*?)<\/title>/i);
+        if (match && match[1]) {
+          const cleanTitle = match[1].replace(/- Google (Sheets|Drive|Dokumen)/gi, '').trim();
+          if (cleanTitle && !/^doc[_-]/i.test(cleanTitle) && cleanTitle.length > 1) {
+            return cleanTitle;
+          }
+        }
+      }
+    } catch (e) {}
+
     return null;
   }
 
@@ -59,7 +83,13 @@ export class DocumentParser {
    * Fetch and parse document data via Server-Side Proxy (/api/proxy) or Direct Fetch
    */
   static async parseFromUrl(rawUrl, customTitle = '', existingId = null) {
-    let title = customTitle;
+    let title = customTitle ? customTitle.trim() : '';
+
+    // Ignore title if it is an internal/generated ID string like doc_12345 or DOC-1234
+    if (title && /^doc[_-]/i.test(title)) {
+      title = '';
+    }
+
     let b64Url = this.obfuscateUrl(rawUrl);
     let proxyEndpoint = `/api/proxy?b64=${encodeURIComponent(b64Url)}`;
     let fetchedText = null;
@@ -72,9 +102,14 @@ export class DocumentParser {
         const serverTitleHeader = response.headers.get('X-Sheet-Title');
         if (serverTitleHeader && !title) {
           try {
-            title = decodeURIComponent(serverTitleHeader);
+            const decoded = decodeURIComponent(serverTitleHeader);
+            if (!/^doc[_-]/i.test(decoded)) {
+              title = decoded;
+            }
           } catch {
-            title = serverTitleHeader;
+            if (!/^doc[_-]/i.test(serverTitleHeader)) {
+              title = serverTitleHeader;
+            }
           }
         }
 
@@ -116,18 +151,20 @@ export class DocumentParser {
       throw new Error('Gagal membaca data spreadsheet. Pastikan akses Google Sheet sudah diset "Siapa saja yang memiliki link dapat melihat".');
     }
 
-    // Try fetching title via CORS proxy if title still blank or default
-    if (!title || title.startsWith('Spreadsheet ')) {
+    // Try fetching title via CORS proxy if title still blank or generic
+    if (!title || title.startsWith('Spreadsheet ') || title === 'Dokumen Spreadsheet' || /^doc[_-]/i.test(title)) {
       if (rawUrl.includes('docs.google.com/spreadsheets')) {
         const sheetIdMatch = rawUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (sheetIdMatch && sheetIdMatch[1]) {
           const fetchedTitle = await this.fetchGoogleSheetTitle(sheetIdMatch[1]);
-          if (fetchedTitle) title = fetchedTitle;
+          if (fetchedTitle && !/^doc[_-]/i.test(fetchedTitle)) {
+            title = fetchedTitle;
+          }
         }
       }
     }
 
-    if (!title) {
+    if (!title || /^doc[_-]/i.test(title)) {
       title = this.extractTitleFromUrl(rawUrl);
     }
 
@@ -140,6 +177,7 @@ export class DocumentParser {
   static async parseMasterIndexSheet(masterUrl) {
     const indexDoc = await this.parseFromUrl(masterUrl, 'Master Database');
     const documents = [];
+    const seenUrls = new Set();
 
     const headers = indexDoc.headers.map(h => h.toLowerCase());
     const nameColIdx = headers.findIndex(h => h.includes('nama') || h.includes('title') || h.includes('dokumen'));
@@ -148,11 +186,21 @@ export class DocumentParser {
 
     for (const row of indexDoc.rows) {
       const url = urlColIdx >= 0 ? row[urlColIdx] : row.find(c => c && c.includes('http'));
-      const name = nameColIdx >= 0 ? row[nameColIdx] : '';
+      const rawName = nameColIdx >= 0 ? row[nameColIdx] : '';
+      const cleanName = rawName ? rawName.trim() : '';
 
       if (url && url.startsWith('http')) {
+        // Extract sheetId or normalized URL for strict deduplication
+        const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        const urlKey = sheetIdMatch && sheetIdMatch[1] ? sheetIdMatch[1] : url.trim().toLowerCase();
+
+        if (seenUrls.has(urlKey)) {
+          continue; // Skip duplicate document URL
+        }
+        seenUrls.add(urlKey);
+
         try {
-          const doc = await this.parseFromUrl(url, name);
+          const doc = await this.parseFromUrl(url, cleanName);
           if (colorColIdx >= 0 && row[colorColIdx]) {
             doc.badgeColor = row[colorColIdx];
           }
@@ -169,16 +217,11 @@ export class DocumentParser {
   static extractTitleFromUrl(url) {
     try {
       const parsed = new URL(url);
-      if (parsed.hostname.includes('google.com')) {
-        const pathParts = parsed.pathname.split('/');
-        const idPart = pathParts[3] || 'Dokumen';
-        return 'Spreadsheet ' + idPart.substring(0, 10);
-      }
       const filename = parsed.pathname.split('/').pop();
-      if (filename && filename.length > 2) {
+      if (filename && filename.length > 2 && !filename.includes('gviz') && !filename.includes('edit')) {
         return decodeURIComponent(filename).replace(/(\.csv|\.tsv|\.txt)$/i, '');
       }
-      return 'Dokumen ' + new Date().toLocaleDateString('id-ID');
+      return 'Dokumen Spreadsheet';
     } catch {
       return 'Dokumen Spreadsheet';
     }
@@ -213,12 +256,14 @@ export class DocumentParser {
     const headers = rawHeaders.map((h, idx) => (h && h.trim()) ? h.trim() : `Kolom ${idx + 1}`);
     const dataRows = validRows.slice(1).filter(r => r.some(cell => cell && cell.trim() !== ''));
 
+    const cleanTitle = (title && !/^doc[_-]/i.test(title.trim())) ? title.trim() : 'Dokumen Spreadsheet';
+
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1'];
-    const badgeColor = colors[Math.abs(this.hashCode(title)) % colors.length];
+    const badgeColor = colors[Math.abs(this.hashCode(cleanTitle)) % colors.length];
 
     return {
-      id: existingId || ('doc_' + Math.abs(this.hashCode(title + sourceUrl))),
-      name: title || 'Dokumen Spreadsheet',
+      id: existingId || ('doc_' + Math.abs(this.hashCode(cleanTitle + sourceUrl))),
+      name: cleanTitle,
       sourceUrl: sourceUrl,
       headers: headers,
       rows: dataRows,

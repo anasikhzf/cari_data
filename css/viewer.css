@@ -311,3 +311,78 @@ mark.highlight {
 @media (max-width: 360px) {
   .brand-title { display: none; }
 }
+
+/* 6. Global Loading Overlay & Toast Notice */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.loading-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.loading-card {
+  background: var(--bg-surface, #1e293b);
+  color: var(--text-primary, #f8fafc);
+  padding: 1.5rem 2rem;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: center;
+  max-width: 300px;
+}
+
+.loading-spinner-lg {
+  width: 38px;
+  height: 38px;
+  border: 3.5px solid rgba(59, 130, 246, 0.25);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+.loading-text {
+  font-size: 0.925rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.toast-notice {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(15, 23, 42, 0.92);
+  color: #ffffff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 30px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 10001;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast-notice.active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
