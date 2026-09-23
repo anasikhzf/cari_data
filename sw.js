@@ -1,4 +1,4 @@
-const CACHE_NAME = 'caridata-v4';
+const CACHE_NAME = 'caridata-v5';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -52,8 +52,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Skip chrome-extension, non-http, or external API/Proxy requests (let browser fetch directly)
+  // Skip chrome-extension, non-http, or API/Proxy requests (always fetch fresh from server)
   if (!url.protocol.startsWith('http')) return;
+  if (url.pathname.startsWith('/api/')) return;
   if (url.origin !== self.location.origin) return;
 
   // 1. Navigation Requests (HTML Page loading e.g. / or /index.html)

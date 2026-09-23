@@ -34,7 +34,7 @@ app.get('/api/proxy', async (req, res) => {
     if (sheetIdMatch && sheetIdMatch[1]) {
       sheetId = sheetIdMatch[1];
       const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
-      serverFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}`;
+      serverFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}&_t=${Date.now()}`;
     }
   }
 
@@ -70,6 +70,9 @@ app.get('/api/proxy', async (req, res) => {
 
     const data = await response.text();
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.setHeader('Access-Control-Expose-Headers', 'X-Sheet-Title');
     if (extractedTitle) {
       res.setHeader('X-Sheet-Title', encodeURIComponent(extractedTitle));

@@ -25,7 +25,7 @@ export class DocumentParser {
       if (sheetIdMatch && sheetIdMatch[1]) {
         const sheetId = sheetIdMatch[1];
         const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
-        return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}`;
+        return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}&_t=${Date.now()}`;
       }
     }
 
@@ -89,12 +89,12 @@ export class DocumentParser {
     }
 
     let b64Url = this.obfuscateUrl(rawUrl);
-    let proxyEndpoint = `/api/proxy?b64=${encodeURIComponent(b64Url)}`;
+    let proxyEndpoint = `/api/proxy?b64=${encodeURIComponent(b64Url)}&_t=${Date.now()}`;
     let fetchedText = null;
 
     // 1. Attempt Server-Side Proxy Fetch
     try {
-      const response = await fetch(proxyEndpoint);
+      const response = await fetch(proxyEndpoint, { cache: 'no-store' });
       if (response.ok) {
         // Read X-Sheet-Title header from Server Proxy
         const serverTitleHeader = response.headers.get('X-Sheet-Title');

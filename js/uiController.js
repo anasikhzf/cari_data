@@ -112,7 +112,9 @@ export class UIController {
               📁
             </div>
             <div class="doc-actions-menu">
-              ${isLocked ? `<span class="lock-indicator-badge" title="Folder Terkunci PIN">🔐</span>` : ''}
+              <button class="card-btn-danger pin-folder-btn" data-id="${folder.id}" data-name="${folder.name}" data-pin="${folder.pinHash || ''}" title="${isLocked ? 'Ubah/Hapus Kunci PIN' : 'Kunci Folder Dengan PIN'}">
+                ${isLocked ? '🔐' : '🔑'}
+              </button>
               <button class="card-btn-danger delete-folder-btn" data-id="${folder.id}" data-name="${folder.name}" data-pin="${folder.pinHash || ''}" title="Hapus Folder">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
@@ -150,7 +152,9 @@ export class UIController {
               📄
             </div>
             <div class="doc-actions-menu">
-              ${isLocked ? `<span class="lock-indicator-badge" title="File Terkunci PIN">🔐</span>` : ''}
+              <button class="card-btn-danger pin-doc-btn" data-id="${doc.id}" data-name="${doc.name}" data-pin="${doc.pinHash || ''}" title="${isLocked ? 'Ubah/Hapus Kunci PIN' : 'Kunci File Dengan PIN'}">
+                ${isLocked ? '🔐' : '🔑'}
+              </button>
               <button class="card-btn-danger share-doc-btn" data-url="${doc.sourceUrl || ''}" data-title="${doc.name}" title="Bagikan Link Dokumen">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
               </button>
@@ -177,6 +181,26 @@ export class UIController {
     grid.innerHTML = html;
 
     // Attach Action Handlers
+    grid.querySelectorAll('.pin-folder-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name');
+        const pin = btn.getAttribute('data-pin');
+        this.managePinForFolder(id, name, pin);
+      });
+    });
+
+    grid.querySelectorAll('.pin-doc-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name');
+        const pin = btn.getAttribute('data-pin');
+        this.managePinForDoc(id, name, pin);
+      });
+    });
+
     grid.querySelectorAll('.delete-folder-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -205,6 +229,69 @@ export class UIController {
         this.shareDocumentLink(url, title);
       });
     });
+  }
+
+  async managePinForFolder(id, name, currentPin) {
+    const action = async () => {
+      const newPin = prompt(`🔐 Pengaturan Kunci PIN untuk Folder "${name}":\n\nMasukkan PIN baru (kosongkan jika ingin menghapus PIN):`, currentPin || '');
+      if (newPin !== null) {
+        const folder = await db.getFolderById(id);
+        if (folder) {
+          folder.pinHash = newPin.trim() || null;
+          folder.updatedAt = new Date().toISOString();
+          await db.saveFolder(folder);
+          await this.renderDashboard();
+          this.showToast(folder.pinHash ? '🔒 PIN Folder berhasil diperbarui!' : '🔓 Kunci PIN Folder dihapus');
+        }
+      }
+    };
+
+    if (currentPin) {
+      this.requestPinAuth(name, currentPin, action);
+    } else {
+      action();
+    }
+  }
+
+  async managePinForDoc(id, name, currentPin) {
+    const action = async () => {
+      const newPin = prompt(`🔐 Pengaturan Kunci PIN untuk Dokumen "${name}":\n\nMasukkan PIN baru (kosongkan jika ingin menghapus PIN):`, currentPin || '');
+      if (newPin !== null) {
+        const doc = await db.getDocumentById(id);
+        if (doc) {
+          doc.pinHash = newPin.trim() || null;
+          doc.updatedAt = new Date().toISOString();
+          await db.saveDocument(doc);
+
+          // Update Master Google Sheet Webhook if set
+          if (CONFIG && CONFIG.MASTER_WEBHOOK_URL) {
+            try {
+              fetch(CONFIG.MASTER_WEBHOOK_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: doc.id,
+                  name: doc.name,
+                  url: doc.sourceUrl || '',
+                  color: doc.badgeColor || '#2563eb',
+                  pin: doc.pinHash || ''
+                })
+              }).catch(() => {});
+            } catch (e) {}
+          }
+
+          await this.renderDashboard();
+          this.showToast(doc.pinHash ? '🔒 PIN Dokumen berhasil diperbarui!' : '🔓 Kunci PIN Dokumen dihapus');
+        }
+      }
+    };
+
+    if (currentPin) {
+      this.requestPinAuth(name, currentPin, action);
+    } else {
+      action();
+    }
   }
 
   /* -------------------------------------------------------------------------- */

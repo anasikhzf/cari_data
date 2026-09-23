@@ -10,6 +10,6 @@ export const CONFIG = {
   // Storage key for user dynamic Master Sheet URL
   STORAGE_KEY_MASTER_URL: "caridata_master_sheet_url",
 
-  // Auto refresh interval in background (milliseconds) - Default: 5 minutes
-  AUTO_SYNC_INTERVAL_MS: 300000
+  // Auto refresh interval in background (milliseconds) - Default: 20 seconds for real-time sync
+  AUTO_SYNC_INTERVAL_MS: 20000
 };

@@ -13,7 +13,9 @@ export async function onRequest(context) {
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Expose-Headers': 'X-Sheet-Title',
-    'Cache-Control': 'public, max-age=60, s-maxage=300'
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
   };
 
   if (request.method === 'OPTIONS') {
@@ -44,7 +46,7 @@ export async function onRequest(context) {
     if (sheetIdMatch && sheetIdMatch[1]) {
       sheetId = sheetIdMatch[1];
       const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
-      serverFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}`;
+      serverFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}&_t=${Date.now()}`;
     }
   }
 

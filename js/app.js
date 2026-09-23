@@ -347,7 +347,7 @@ class App {
     const errText = document.getElementById('pinErrorMessage');
     const entered = input ? input.value.trim() : '';
 
-    if (entered === this.pendingPinTargetHash) {
+    if (String(entered).trim() === String(this.pendingPinTargetHash).trim()) {
       document.getElementById('securityPinModal')?.classList.remove('active');
       const callback = this.pendingPinCallback;
       this.pendingPinCallback = null;
@@ -435,8 +435,15 @@ class App {
     try {
       const docs = await DocumentParser.parseMasterIndexSheet(masterUrl);
       if (docs && docs.length > 0) {
+        const existingDocs = await db.getAllDocuments();
+        const existingPinMap = new Map();
+        existingDocs.forEach(d => { if (d.pinHash) existingPinMap.set(d.id, d.pinHash); });
+
         await db.clearAllDocuments();
         for (const doc of docs) {
+          if (!doc.pinHash && existingPinMap.has(doc.id)) {
+            doc.pinHash = existingPinMap.get(doc.id);
+          }
           await db.saveDocument(doc);
         }
         await this.ui.renderDashboard();
@@ -486,7 +493,9 @@ class App {
               name: docData.name,
               url: url,
               color: docData.badgeColor,
-              note: currentFolderName || ''
+              folder: currentFolderName || '',
+              note: currentFolderName || '',
+              pin: docData.pinHash || ''
             })
           }).catch(() => {});
         } catch (e) {}
