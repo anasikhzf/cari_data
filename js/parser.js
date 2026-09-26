@@ -194,7 +194,8 @@ export class DocumentParser {
       const rawPin = pinColIdx >= 0 ? row[pinColIdx] : '';
       const rawTime = timeColIdx >= 0 ? row[timeColIdx] : '';
 
-      const cleanId = rawId && rawId.trim() ? rawId.trim() : `DOC-${i + 1}-${Math.floor(Math.random() * 8999 + 1000)}`;
+      const baseId = rawId && rawId.trim() ? rawId.trim() : `DOC-${i + 1}-${Math.floor(Math.random() * 8999 + 1000)}`;
+      const cleanId = `${baseId}_idx${i}`;
       const cleanName = rawName ? rawName.trim() : '';
       const cleanFolder = rawFolder ? rawFolder.trim() : '';
       const cleanPin = rawPin ? rawPin.trim() : null;

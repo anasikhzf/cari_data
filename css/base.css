@@ -279,3 +279,30 @@ html, body {
   width: 18px;
   height: 18px;
 }
+
+/* 4. App Footer Styling */
+.app-footer {
+  width: 100%;
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  padding: 1rem 0.75rem;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.footer-container p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.footer-container a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.footer-container a:hover {
+  text-decoration: underline;
+  color: var(--primary-hover);
+}

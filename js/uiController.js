@@ -50,23 +50,22 @@ export class UIController {
 
   /* -------------------------------------------------------------------------- */
   /* Dashboard Breadcrumb Navigation                                            */
-  /* -------------------------------------------------------------------------- */
-  updateBreadcrumb() {
+  /* ------------------------------------------------------------------  updateBreadcrumb() {
     const nav = document.getElementById('dashboardBreadcrumb');
     const titleEl = document.getElementById('dashboardFolderTitle');
     const subtitleEl = document.getElementById('dashboardFolderSubtitle');
     if (!nav) return;
 
     if (!this.app.currentFolderId) {
-      nav.innerHTML = `<span class="breadcrumb-item active" onclick="window.app.navigateToFolder(null)">🏠 Beranda Utama</span>`;
+      nav.innerHTML = `<span class="breadcrumb-item active" onclick="window.app.navigateToFolder(null)"><i class="fa-solid fa-house" style="margin-right:0.3rem;"></i> Beranda Utama</span>`;
       if (titleEl) titleEl.textContent = 'Penyimpanan Dokumen & Folder';
       if (subtitleEl) subtitleEl.textContent = 'Kelola folder, kunci file dengan PIN, dan cari data spreadsheet masif secara cepat.';
     } else {
       const folderName = this.app.currentFolder ? this.app.currentFolder.name : 'Folder';
       nav.innerHTML = `
-        <span class="breadcrumb-item" onclick="window.app.navigateToFolder(null)">🏠 Beranda</span>
+        <span class="breadcrumb-item" onclick="window.app.navigateToFolder(null)"><i class="fa-solid fa-house" style="margin-right:0.3rem;"></i> Beranda</span>
         <span class="breadcrumb-separator">&rsaquo;</span>
-        <span class="breadcrumb-item active">📁 ${folderName}</span>
+        <span class="breadcrumb-item active"><i class="fa-solid fa-folder-open" style="margin-right:0.3rem;"></i> ${folderName}</span>
       `;
       if (titleEl) titleEl.textContent = `Folder: ${folderName}`;
       if (subtitleEl) subtitleEl.textContent = `Menampilkan file & dokumen di dalam folder "${folderName}".`;
@@ -89,7 +88,7 @@ export class UIController {
       grid.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="14"/></svg>
+            <i class="fa-solid fa-folder-open" style="font-size:1.5rem;"></i>
           </div>
           <h3>Folder ini kosong</h3>
           <p style="font-size:0.85rem; color:var(--text-secondary); max-width:320px;">
@@ -109,25 +108,25 @@ export class UIController {
         <div class="doc-card folder-card" onclick="window.app.navigateToFolder('${folder.id}')">
           <div class="doc-card-header">
             <div class="doc-badge" style="background-color:#f59e0b;">
-              📁
+              <i class="fa-solid fa-folder"></i>
             </div>
             <div class="doc-actions-menu">
               <button class="card-btn-danger pin-folder-btn" data-id="${folder.id}" data-name="${folder.name}" data-pin="${folder.pinHash || ''}" title="${isLocked ? 'Ubah/Hapus Kunci PIN' : 'Kunci Folder Dengan PIN'}">
-                ${isLocked ? '🔐' : '🔑'}
+                <i class="fa-solid ${isLocked ? 'fa-lock' : 'fa-key'}"></i>
               </button>
               <button class="card-btn-danger delete-folder-btn" data-id="${folder.id}" data-name="${folder.name}" data-pin="${folder.pinHash || ''}" title="Hapus Folder">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <i class="fa-solid fa-trash-can"></i>
               </button>
             </div>
           </div>
           <div class="doc-card-body">
             <div class="doc-title">${folder.name}</div>
             <div class="doc-meta">
-              <span>📂 Folder Penyimpanan</span>
+              <span><i class="fa-solid fa-folder" style="margin-right:0.25rem;"></i> Folder Penyimpanan</span>
             </div>
           </div>
           <div class="doc-card-footer">
-            <span>${isLocked ? '🔒 Terkunci PIN' : '🔓 Publik'}</span>
+            <span><i class="fa-solid ${isLocked ? 'fa-lock' : 'fa-lock-open'}" style="margin-right:0.25rem;"></i> ${isLocked ? 'Terkunci PIN' : 'Publik'}</span>
             <span class="doc-open-btn">Buka &rarr;</span>
           </div>
         </div>
@@ -149,30 +148,30 @@ export class UIController {
         <div class="doc-card" data-id="${doc.id}">
           <div class="doc-card-header">
             <div class="doc-badge" style="background-color:${doc.badgeColor || '#2563eb'};">
-              📄
+              <i class="fa-solid fa-file-lines"></i>
             </div>
             <div class="doc-actions-menu">
               <button class="card-btn-danger pin-doc-btn" data-id="${doc.id}" data-name="${doc.name}" data-pin="${doc.pinHash || ''}" title="${isLocked ? 'Ubah/Hapus Kunci PIN' : 'Kunci File Dengan PIN'}">
-                ${isLocked ? '🔐' : '🔑'}
+                <i class="fa-solid ${isLocked ? 'fa-lock' : 'fa-key'}"></i>
               </button>
               <button class="card-btn-danger share-doc-btn" data-url="${doc.sourceUrl || ''}" data-title="${doc.name}" title="Bagikan Link Dokumen">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <i class="fa-solid fa-share-nodes"></i>
               </button>
               <button class="card-btn-danger delete-doc-btn" data-id="${doc.id}" data-name="${doc.name}" data-pin="${doc.pinHash || ''}" title="Hapus Dokumen">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <i class="fa-solid fa-trash-can"></i>
               </button>
             </div>
           </div>
           <div class="doc-card-body" onclick="window.app.openDocument('${doc.id}')">
             <div class="doc-title">${doc.name}</div>
             <div class="doc-meta">
-              <span>📊 ${doc.rowCount.toLocaleString('id-ID')} baris</span>
-              <span>📋 ${doc.colCount} kolom</span>
+              <span><i class="fa-solid fa-table-list" style="margin-right:0.25rem;"></i> ${doc.rowCount.toLocaleString('id-ID')} baris</span>
+              <span><i class="fa-solid fa-table-columns" style="margin-right:0.25rem;"></i> ${doc.colCount} kolom</span>
             </div>
           </div>
           <div class="doc-card-footer" onclick="window.app.openDocument('${doc.id}')">
-            <span>📅 ${updatedDate}</span>
-            <span class="doc-open-btn">${isLocked ? '🔒 Buka' : 'Buka &rarr;'}</span>
+            <span><i class="fa-solid fa-calendar-days" style="margin-right:0.25rem;"></i> ${updatedDate}</span>
+            <span class="doc-open-btn">${isLocked ? '<i class="fa-solid fa-lock" style="margin-right:0.2rem;"></i> Buka' : 'Buka &rarr;'}</span>
           </div>
         </div>
       `;

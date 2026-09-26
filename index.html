@@ -4,10 +4,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CariData - Viewer & Pencarian Spreadsheet Statis</title>
+  <title>CariData - Viewer & Pencarian Spreadsheet Online Cepat</title>
   <meta name="description"
-    content="Aplikasi web PWA ringan untuk melihat dan mencari data spreadsheet masif secara cepat.">
+    content="Aplikasi PWA CariData untuk melihat, mengelola, dan mencari ribuan baris data spreadsheet masif dari Google Sheets secara realtime dan super cepat.">
+  <meta name="keywords" content="CariData, spreadsheet viewer, google sheets viewer, pencarian data, PWA spreadsheet, anasikhzf">
+  <meta name="author" content="anasikhzf">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://anasikhzf.web.app/">
   <meta name="theme-color" content="#0f172a">
+
+  <!-- Open Graph / Facebook SEO -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://anasikhzf.web.app/">
+  <meta property="og:title" content="CariData - Viewer & Pencarian Spreadsheet Online Cepat">
+  <meta property="og:description" content="Aplikasi PWA CariData untuk melihat, mengelola, dan mencari data spreadsheet masif dari Google Sheets secara realtime.">
+  <meta property="og:image" content="https://anasikhzf.web.app/assets/icon-512.png">
+
+  <!-- Twitter SEO -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://anasikhzf.web.app/">
+  <meta property="twitter:title" content="CariData - Viewer & Pencarian Spreadsheet">
+  <meta property="twitter:description" content="Aplikasi PWA CariData untuk melihat, mengelola, dan mencari data spreadsheet masif secara cepat.">
+  <meta property="twitter:image" content="https://anasikhzf.web.app/assets/icon-512.png">
+
+  <!-- Font Awesome Icons Library (Online CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
   <!-- PWA & Mobile Optimization -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -20,8 +41,6 @@
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png">
-  <link rel="icon" type="image/svg+xml"
-    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%230f172a'/><circle cx='50' cy='50' r='42' fill='none' stroke='%232563eb' stroke-width='4'/><path d='M65 33 A 25 25 0 1 0 65 67' fill='none' stroke='%23ffffff' stroke-width='10' stroke-linecap='round'/><circle cx='65' cy='33' r='5' fill='%2338bdf8'/></svg>">
 
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="styles.css">
@@ -126,7 +145,7 @@
 
       <!-- Auto Cleanup Notice Banner -->
       <div id="cleanupNoticeBanner" class="cleanup-banner hidden">
-        <span id="cleanupNoticeText">🧹 Pembersihan Otomatis: Dokumen/Folder yang tidak dibuka selama 1 bulan telah
+        <span id="cleanupNoticeText"><i class="fa-solid fa-broom" style="margin-right:0.4rem;"></i> Pembersihan Otomatis: Dokumen/Folder yang tidak dibuka selama 1 bulan telah
           dihapus secara otomatis.</span>
         <button onclick="this.parentElement.classList.add('hidden')" class="close-banner-btn">&times;</button>
       </div>
@@ -199,11 +218,18 @@
     </section>
   </main>
 
+  <!-- App Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <p>&copy; 2026 CariData. Developed by <a href="https://anasikhzf.web.app" target="_blank" rel="noopener noreferrer">anasikhzf</a></p>
+    </div>
+  </footer>
+
   <!-- Modal: Create Folder -->
   <div id="addFolderModal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 class="modal-title">📁 Buat Folder Baru</h3>
+        <h3 class="modal-title"><i class="fa-solid fa-folder-plus text-primary" style="margin-right:0.4rem;"></i> Buat Folder Baru</h3>
         <button id="closeFolderModalBtn" class="card-btn-danger" style="font-size:1.2rem;">&times;</button>
       </div>
       <form id="addFolderForm">
@@ -213,7 +239,7 @@
             required>
         </div>
         <div class="form-group">
-          <label for="folderPinInput" class="form-label">🔐 Kunci PIN Keamanan (Opsional)</label>
+          <label for="folderPinInput" class="form-label"><i class="fa-solid fa-lock" style="margin-right:0.3rem;"></i> Kunci PIN Keamanan (Opsional)</label>
           <input type="password" id="folderPinInput" class="form-input"
             placeholder="Kosongkan jika tanpa kunci (misal: 1234)" maxlength="20" autocomplete="new-password">
           <p class="form-hint">Jika diisi, membuka atau menghapus folder ini wajib memasukkan PIN kunci yang telah
@@ -231,7 +257,7 @@
   <div id="addDocModal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 class="modal-title">📄 Tambah Link Dokumen</h3>
+        <h3 class="modal-title"><i class="fa-solid fa-file-circle-plus text-primary" style="margin-right:0.4rem;"></i> Tambah Link Dokumen</h3>
         <button id="closeModalBtn" class="card-btn-danger" style="font-size:1.2rem;">&times;</button>
       </div>
       <form id="addDocForm">
@@ -242,7 +268,7 @@
           <p class="form-hint">Pastikan akses spreadsheet diset "Siapa saja yang memiliki link dapat melihat".</p>
         </div>
         <div class="form-group">
-          <label for="docPinInput" class="form-label">🔐 Kunci PIN Keamanan File (Opsional)</label>
+          <label for="docPinInput" class="form-label"><i class="fa-solid fa-lock" style="margin-right:0.3rem;"></i> Kunci PIN Keamanan File (Opsional)</label>
           <input type="password" id="docPinInput" class="form-input"
             placeholder="Kosongkan jika tanpa kunci (misal: 1234)" maxlength="20" autocomplete="new-password">
           <p class="form-hint">Jika diisi, membuka atau menghapus file ini wajib memasukkan Kunci PIN.</p>
@@ -259,7 +285,7 @@
   <div id="securityPinModal" class="modal-backdrop">
     <div class="modal-card" style="max-width:380px;">
       <div class="modal-header">
-        <h3 class="modal-title">🔐 Masukkan Kunci Keamanan</h3>
+        <h3 class="modal-title"><i class="fa-solid fa-user-shield text-primary" style="margin-right:0.4rem;"></i> Masukkan Kunci Keamanan</h3>
         <button id="closePinModalBtn" class="card-btn-danger" style="font-size:1.2rem;">&times;</button>
       </div>
       <form id="securityPinForm">
@@ -282,7 +308,7 @@
   <div id="masterSheetModal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 class="modal-title">⚙️ Database Cloud Terpusat</h3>
+        <h3 class="modal-title"><i class="fa-solid fa-sliders text-primary" style="margin-right:0.4rem;"></i> Database Cloud Terpusat</h3>
         <button id="closeMasterModalBtn" class="card-btn-danger" style="font-size:1.2rem;">&times;</button>
       </div>
       <form id="masterSheetForm">
@@ -352,7 +378,7 @@
           <line x1="12" y1="20" x2="12.01" y2="20" />
         </svg>
       </div>
-      <h3 class="modal-title" style="margin-bottom:0.5rem;" id="networkModalTitle">⚠️ Offline / Koneksi Lambat</h3>
+      <h3 class="modal-title" style="margin-bottom:0.5rem;" id="networkModalTitle"><i class="fa-solid fa-triangle-exclamation" style="margin-right:0.3rem;"></i> Offline / Koneksi Lambat</h3>
       <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5; margin-bottom:1.25rem;"
         id="networkModalDesc">
         Aplikasi CariData membutuhkan internet untuk menyinkronkan data live. Perangkat Anda saat ini terdeteksi luring
@@ -360,7 +386,7 @@
       </p>
       <div class="modal-footer" style="justify-content:center; gap:0.5rem;">
         <button type="button" id="dismissNetworkModalBtn" class="btn-secondary">Lanjut Offline</button>
-        <button type="button" id="retryConnectionBtn" class="btn-primary">Coba Lagi 🔄</button>
+        <button type="button" id="retryConnectionBtn" class="btn-primary">Coba Lagi <i class="fa-solid fa-rotate-right" style="margin-left:0.2rem;"></i></button>
       </div>
     </div>
   </div>
