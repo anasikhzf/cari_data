@@ -50,7 +50,8 @@ export class UIController {
 
   /* -------------------------------------------------------------------------- */
   /* Dashboard Breadcrumb Navigation                                            */
-  /* ------------------------------------------------------------------  updateBreadcrumb() {
+  /* -------------------------------------------------------------------------- */
+  updateBreadcrumb() {
     const nav = document.getElementById('dashboardBreadcrumb');
     const titleEl = document.getElementById('dashboardFolderTitle');
     const subtitleEl = document.getElementById('dashboardFolderSubtitle');
