@@ -9,7 +9,7 @@ class DocumentDB {
   }
 
   async init() {
-    // In-memory initialization ready instantly
+    // 100% Menggunakan Google Spreadsheet sebagai database utama tanpa localStorage
     return true;
   }
 
@@ -117,12 +117,19 @@ class DocumentDB {
     return this.folders.delete(id);
   }
 
-  async getOrCreateFolderByName(name) {
+  async clearAllFolders() {
+    this.folders.clear();
+  }
+
+  async getOrCreateFolderByName(name, pinHash = null) {
     if (!name || !name.trim()) return null;
     const cleanName = name.trim();
 
     for (const folder of this.folders.values()) {
       if (folder.name.toLowerCase() === cleanName.toLowerCase()) {
+        if (pinHash && !folder.pinHash) {
+          folder.pinHash = pinHash;
+        }
         return folder.id;
       }
     }
@@ -131,7 +138,7 @@ class DocumentDB {
     const folder = {
       id: folderId,
       name: cleanName,
-      pinHash: null,
+      pinHash: pinHash || null,
       parentId: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

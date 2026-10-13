@@ -82,6 +82,7 @@ export class UIController {
     if (!grid) return;
 
     const allFolders = await db.getAllFolders();
+    const allDocs = await db.getAllDocuments(null);
     const currentFolders = allFolders.filter(f => (!this.app.currentFolderId && !f.parentId) || f.parentId === this.app.currentFolderId);
     const currentDocs = await db.getAllDocuments(this.app.currentFolderId || 'ROOT');
 
@@ -103,8 +104,9 @@ export class UIController {
     let html = '';
 
     // Render Folders
-    currentFolders.forEach(folder => {
-      const isLocked = Boolean(folder.pinHash);
+    for (const folder of currentFolders) {
+      const isFolderLocked = Boolean(folder.pinHash);
+      const folderDocs = allDocs.filter(d => d.folderId === folder.id);
       html += `
         <div class="doc-card folder-card" onclick="window.app.navigateToFolder('${folder.id}')">
           <div class="doc-card-header">
@@ -112,8 +114,8 @@ export class UIController {
               <i class="fa-solid fa-folder"></i>
             </div>
             <div class="doc-actions-menu">
-              <button class="card-btn-danger pin-folder-btn" data-id="${folder.id}" data-name="${folder.name}" data-pin="${folder.pinHash || ''}" title="${isLocked ? 'Ubah/Hapus Kunci PIN' : 'Kunci Folder Dengan PIN'}">
-                <i class="fa-solid ${isLocked ? 'fa-lock' : 'fa-key'}"></i>
+              <button class="card-btn-danger pin-folder-btn" data-id="${folder.id}" data-name="${folder.name}" data-pin="${folder.pinHash || ''}" title="${isFolderLocked ? 'Ubah/Hapus PIN Folder' : 'Kunci Folder Dengan PIN'}">
+                <i class="fa-solid ${isFolderLocked ? 'fa-lock' : 'fa-key'}"></i>
               </button>
               <button class="card-btn-danger delete-folder-btn" data-id="${folder.id}" data-name="${folder.name}" data-pin="${folder.pinHash || ''}" title="Hapus Folder">
                 <i class="fa-solid fa-trash-can"></i>
@@ -123,16 +125,16 @@ export class UIController {
           <div class="doc-card-body">
             <div class="doc-title">${folder.name}</div>
             <div class="doc-meta">
-              <span><i class="fa-solid fa-folder" style="margin-right:0.25rem;"></i> Folder Penyimpanan</span>
+              <span><i class="fa-solid fa-folder-open" style="margin-right:0.25rem;"></i> ${folderDocs.length} berkas</span>
             </div>
           </div>
           <div class="doc-card-footer">
-            <span><i class="fa-solid ${isLocked ? 'fa-lock' : 'fa-lock-open'}" style="margin-right:0.25rem;"></i> ${isLocked ? 'Terkunci PIN' : 'Publik'}</span>
-            <span class="doc-open-btn">Buka &rarr;</span>
+            <span><i class="fa-solid ${isFolderLocked ? 'fa-lock' : 'fa-lock-open'}" style="margin-right:0.25rem;"></i> ${isFolderLocked ? 'Terkunci PIN' : 'Publik'}</span>
+            <span class="doc-open-btn">${isFolderLocked ? '<i class="fa-solid fa-lock" style="margin-right:0.2rem;"></i> Buka' : 'Buka &rarr;'}</span>
           </div>
         </div>
       `;
-    });
+    }
 
     // Render Documents
     currentDocs.forEach(doc => {
@@ -233,13 +235,32 @@ export class UIController {
 
   async managePinForFolder(id, name, currentPin) {
     const action = async () => {
-      const newPin = prompt(`🔐 Pengaturan Kunci PIN untuk Folder "${name}":\n\nMasukkan PIN baru (kosongkan jika ingin menghapus PIN):`, currentPin || '');
+      const newPin = prompt(`🔐 Pengaturan Kunci PIN untuk Folder "${name}":\n(Kunci folder bisa berbeda dari kunci file di dalamnya)\n\nMasukkan PIN baru (kosongkan jika ingin menghapus PIN):`, currentPin || '');
       if (newPin !== null) {
         const folder = await db.getFolderById(id);
         if (folder) {
           folder.pinHash = newPin.trim() || null;
           folder.updatedAt = new Date().toISOString();
           await db.saveFolder(folder);
+
+          // Update PIN Folder langsung ke Master Google Sheets via Webhook
+          if (CONFIG && CONFIG.MASTER_WEBHOOK_URL) {
+            try {
+              fetch(CONFIG.MASTER_WEBHOOK_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'update_folder_pin',
+                  id: id,
+                  folder: name,
+                  name: name,
+                  pin: folder.pinHash || ''
+                })
+              }).catch(() => {});
+            } catch (e) {}
+          }
+
           await this.renderDashboard();
           this.showToast(folder.pinHash ? '🔒 PIN Folder berhasil diperbarui!' : '🔓 Kunci PIN Folder dihapus');
         }
@@ -379,7 +400,25 @@ export class UIController {
         if (this.app.currentFolderId === id) {
           this.app.currentFolderId = null;
         }
+
+        // Hapus folder dari Master Google Sheet jika webhook aktif
+        if (CONFIG && CONFIG.MASTER_WEBHOOK_URL) {
+          try {
+            fetch(CONFIG.MASTER_WEBHOOK_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'delete_folder',
+                folder: name,
+                id: id
+              })
+            }).catch(() => {});
+          } catch (e) {}
+        }
+
         await this.renderDashboard();
+        this.showToast(`🗑️ Folder "${name}" telah dihapus`);
       }
     };
 

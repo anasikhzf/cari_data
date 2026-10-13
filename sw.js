@@ -1,4 +1,4 @@
-const CACHE_NAME = 'caridata-v5';
+const CACHE_NAME = 'caridata-v6';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -6,9 +6,13 @@ const ASSETS_TO_CACHE = [
   './styles.css',
   './js/db.js',
   './js/parser.js',
+  './js/uiController.js',
+  './js/viewerController.js',
   './js/searchEngine.js',
   './js/app.js',
   './manifest.json',
+  './robots.txt',
+  './sitemap.xml',
   './assets/icon-192.png',
   './assets/icon-512.png'
 ];

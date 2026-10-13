@@ -200,6 +200,7 @@ export class DocumentParser {
       const cleanFolder = rawFolder ? rawFolder.trim() : '';
       const cleanPin = rawPin ? rawPin.trim() : null;
 
+      // 1. Jika baris memiliki URL spreadsheet valid: buat dokumen
       if (url && url.startsWith('http')) {
         try {
           const doc = await this.parseFromUrl(url, cleanName, cleanId);
@@ -225,6 +226,14 @@ export class DocumentParser {
           documents.push(doc);
         } catch (e) {
           console.warn('Failed to parse sub-document from Master Index:', url, e);
+        }
+      } 
+      // 2. Jika baris murni FOLDER (tanpa URL file): daftarkan folder ke database Master beserta PIN foldernya jika ada
+      else if (cleanFolder || cleanName) {
+        const folderNameToCreate = cleanFolder || cleanName;
+        // Pastikan bukan baris header berulang
+        if (folderNameToCreate.toLowerCase() !== 'nama folder' && folderNameToCreate.toLowerCase() !== 'folder') {
+          await db.getOrCreateFolderByName(folderNameToCreate, cleanPin);
         }
       }
     }

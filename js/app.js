@@ -300,24 +300,36 @@ class App {
 
     if (!name) return;
 
-    const folder = {
-      id: 'folder_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      name: name,
-      pinHash: pin || null,
-      parentId: this.currentFolderId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      lastAccessedAt: new Date().toISOString()
-    };
+    const folderId = await db.getOrCreateFolderByName(name, pin || null);
 
-    await db.saveFolder(folder);
+    // Kirim sinkronisasi pembuatan folder ke Master Google Sheet jika webhook aktif
+    if (CONFIG.MASTER_WEBHOOK_URL) {
+      try {
+        fetch(CONFIG.MASTER_WEBHOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add_folder',
+            id: folderId,
+            folder: name,
+            name: name,
+            pin: pin || '',
+            note: 'Folder Penyimpanan'
+          })
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
     this.closeFolderModal();
     await this.ui.renderDashboard();
+    this.ui.showToast(`📁 Folder "${name}" berhasil dibuat & tersimpan di Spreadsheet`);
   }
 
   async navigateToFolder(folderId, pushHistory = true) {
     if (folderId) {
       const folder = await db.getFolderById(folderId);
+      // Jika folder memiliki Kunci PIN Keamanan, minta PIN terlebih dahulu
       if (folder && folder.pinHash) {
         this.ui.requestPinAuth(folder.name, folder.pinHash, async () => {
           this.currentFolderId = folderId;
@@ -337,7 +349,7 @@ class App {
     }
     await this.ui.renderDashboard();
     if (pushHistory) {
-      history.pushState({ page: 'dashboard', folderId: null }, '', window.location.href);
+      history.pushState({ page: folderId ? 'folder' : 'dashboard', folderId }, '', window.location.href);
     }
   }
 
@@ -434,20 +446,20 @@ class App {
     }
     try {
       const docs = await DocumentParser.parseMasterIndexSheet(masterUrl);
-      if (docs && docs.length > 0) {
-        const existingDocs = await db.getAllDocuments();
-        const existingPinMap = new Map();
-        existingDocs.forEach(d => { if (d.pinHash) existingPinMap.set(d.id, d.pinHash); });
+      const existingDocs = await db.getAllDocuments();
+      const existingPinMap = new Map();
+      existingDocs.forEach(d => { if (d.pinHash) existingPinMap.set(d.id, d.pinHash); });
 
-        await db.clearAllDocuments();
+      await db.clearAllDocuments();
+      if (docs && docs.length > 0) {
         for (const doc of docs) {
           if (!doc.pinHash && existingPinMap.has(doc.id)) {
             doc.pinHash = existingPinMap.get(doc.id);
           }
           await db.saveDocument(doc);
         }
-        await this.ui.renderDashboard();
       }
+      await this.ui.renderDashboard();
     } catch (err) {
       console.warn('Master sheet sync error:', err);
     } finally {
