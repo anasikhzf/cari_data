@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
 
-# Sitemap Index for Google Search Console
 Sitemap: https://cari-data.pages.dev/sitemap.xml

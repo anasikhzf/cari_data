@@ -1,7 +1,0 @@
-/* ==========================================================================
-   CariData Main Stylesheet Entrypoint (Modular Clean Architecture)
-   ========================================================================== */
-
-@import './css/base.css';
-@import './css/components.css';
-@import './css/viewer.css';

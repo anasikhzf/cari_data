@@ -1,6 +1,5 @@
 /**
- * In-Memory Database module replacing browser storage (IndexedDB).
- * Uses Google Spreadsheet as the primary source of truth (DB utama).
+ * In-Memory Database store with optional caching and Master Google Sheets as Single Source of Truth
  */
 class DocumentDB {
   constructor() {
@@ -9,32 +8,11 @@ class DocumentDB {
   }
 
   async init() {
-    // 100% Menggunakan Google Spreadsheet sebagai database utama tanpa localStorage
     return true;
   }
 
-  async ensureInitialized() {
-    return true;
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /* Document CRUD & Access Updates                                             */
-  /* -------------------------------------------------------------------------- */
   async getAllDocuments(folderId = null) {
-    let docs = Array.from(this.documents.values()).map(doc => ({
-      id: doc.id,
-      name: doc.name,
-      sourceUrl: doc.sourceUrl,
-      rowCount: doc.rowCount,
-      colCount: doc.colCount,
-      headers: doc.headers,
-      rows: doc.rows,
-      updatedAt: doc.updatedAt,
-      lastAccessedAt: doc.lastAccessedAt || doc.updatedAt,
-      badgeColor: doc.badgeColor,
-      folderId: doc.folderId || null,
-      pinHash: doc.pinHash || null
-    }));
+    let docs = Array.from(this.documents.values()).map(doc => ({ ...doc }));
 
     if (folderId === 'ROOT' || folderId === null) {
       docs = docs.filter(d => !d.folderId || d.folderId === 'ROOT');
@@ -51,7 +29,7 @@ class DocumentDB {
     if (doc) {
       doc.lastAccessedAt = new Date().toISOString();
     }
-    return doc || null;
+    return doc ? { ...doc } : null;
   }
 
   async saveDocument(doc) {
@@ -64,7 +42,7 @@ class DocumentDB {
     if (!doc.updatedAt) {
       doc.updatedAt = new Date().toISOString();
     }
-    this.documents.set(doc.id, doc);
+    this.documents.set(doc.id, { ...doc });
     return doc.id;
   }
 
@@ -76,11 +54,8 @@ class DocumentDB {
     this.documents.clear();
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* Folder Operations                                                          */
-  /* -------------------------------------------------------------------------- */
   async getAllFolders() {
-    const folders = Array.from(this.folders.values());
+    const folders = Array.from(this.folders.values()).map(f => ({ ...f }));
     folders.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     return folders;
   }
@@ -90,7 +65,7 @@ class DocumentDB {
     if (folder) {
       folder.lastAccessedAt = new Date().toISOString();
     }
-    return folder || null;
+    return folder ? { ...folder } : null;
   }
 
   async saveFolder(folder) {
@@ -103,12 +78,11 @@ class DocumentDB {
     if (!folder.updatedAt) {
       folder.updatedAt = new Date().toISOString();
     }
-    this.folders.set(folder.id, folder);
+    this.folders.set(folder.id, { ...folder });
     return folder.id;
   }
 
   async deleteFolder(id) {
-    // Move contained documents back to ROOT
     for (const [docId, doc] of this.documents.entries()) {
       if (doc.folderId === id) {
         doc.folderId = null;
@@ -156,11 +130,6 @@ class DocumentDB {
     }
     return hash;
   }
-
-  async performAutoCleanup(maxInactiveDays = 30) {
-    return { deletedDocsCount: 0, deletedFoldersCount: 0 };
-  }
 }
 
 export const db = new DocumentDB();
-
