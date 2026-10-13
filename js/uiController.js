@@ -157,9 +157,6 @@ export class UIController {
               <button class="card-btn-danger pin-doc-btn" data-id="${doc.id}" data-name="${doc.name}" data-pin="${doc.pinHash || ''}" title="${isLocked ? 'Ubah/Hapus Kunci PIN' : 'Kunci File Dengan PIN'}">
                 <i class="fa-solid ${isLocked ? 'fa-lock' : 'fa-key'}"></i>
               </button>
-              <button class="card-btn-danger share-doc-btn" data-url="${doc.sourceUrl || ''}" data-title="${doc.name}" title="Bagikan Link Dokumen">
-                <i class="fa-solid fa-share-nodes"></i>
-              </button>
               <button class="card-btn-danger delete-doc-btn" data-id="${doc.id}" data-name="${doc.name}" data-pin="${doc.pinHash || ''}" title="Hapus Dokumen">
                 <i class="fa-solid fa-trash-can"></i>
               </button>
@@ -220,15 +217,6 @@ export class UIController {
         const name = btn.getAttribute('data-name');
         const pin = btn.getAttribute('data-pin');
         this.confirmDeleteDocument(id, name, pin);
-      });
-    });
-
-    grid.querySelectorAll('.share-doc-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const url = btn.getAttribute('data-url');
-        const title = btn.getAttribute('data-title');
-        this.shareDocumentLink(url, title);
       });
     });
   }
@@ -338,25 +326,6 @@ export class UIController {
 
     if (modal) modal.classList.add('active');
     setTimeout(() => input?.focus(), 100);
-  }
-
-  shareDocumentLink(url, title) {
-    if (!url) {
-      alert('Dokumen ini adalah data lokal tanpa link publik.');
-      return;
-    }
-
-    const b64 = DocumentParser.obfuscateUrl(url);
-    const shareUrl = `${window.location.origin}${window.location.pathname}?b64=${encodeURIComponent(b64)}&title=${encodeURIComponent(title)}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert('🔗 Link dokumen terenkripsi berhasil disalin! Link ini aman dan menyembunyikan alamat spreadsheet asli.');
-      }).catch(() => {
-        prompt('Salin link dokumen berikut:', shareUrl);
-      });
-    } else {
-      prompt('Salin link dokumen berikut:', shareUrl);
-    }
   }
 
   async confirmDeleteDocument(id, name, pinHash) {

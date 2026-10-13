@@ -1,0 +1,29 @@
+# Security & Direct File Access Blocking Rules for Cloudflare Pages
+
+# 1. Block direct browser URL viewing for sensitive markdown, documentation, and configuration files
+/sheet.md
+  X-Robots-Tag: noindex, nofollow
+  Status: 404
+
+/README.md
+  X-Robots-Tag: noindex, nofollow
+  Status: 404
+
+/generate_icons.py
+  X-Robots-Tag: noindex, nofollow
+  Status: 404
+
+/server.js
+  X-Robots-Tag: noindex, nofollow
+  Status: 404
+
+# 2. Block direct URL inspection for internal data directory
+/data/*
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+
+# 3. Security headers for all web assets
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin

@@ -31,12 +31,12 @@ class App {
     this.bindEvents();
     this.setupAutoSync();
     this.setupHistoryAndBackHandling();
+    this.sanitizeBrowserUrl();
     await this.ui.checkNetworkStatus(true);
 
     try {
       this.ui.showLoading('Menyinkronkan data dari Google Sheets...');
       await db.init();
-      await this.handleUrlQueryImport();
       
       const targetMasterUrl = this.masterSheetUrl || CONFIG.MASTER_SHEET_URL;
       if (targetMasterUrl) {
@@ -124,24 +124,10 @@ class App {
     }
   }
 
-  async handleUrlQueryImport() {
-    const params = new URLSearchParams(window.location.search);
-    let docUrl = params.get('url') || params.get('sheet') || '';
-    const b64 = params.get('b64');
-    const docTitle = params.get('title') || '';
-
-    if (b64) {
-      try { docUrl = atob(b64); } catch { docUrl = decodeURIComponent(b64); }
-    }
-
-    if (docUrl) {
-      try {
-        const docData = await DocumentParser.parseFromUrl(docUrl, docTitle);
-        await db.saveDocument(docData);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } catch (err) {
-        console.warn('URL auto-import failed:', err);
-      }
+  sanitizeBrowserUrl() {
+    // Bersihkan query string atau parameter apa pun dari URL browser agar file tidak bisa dilihat/diekspos lewat URL
+    if (window.location.search || window.location.hash) {
+      window.history.replaceState({ page: 'dashboard', folderId: null }, document.title, window.location.pathname);
     }
   }
 

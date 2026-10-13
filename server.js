@@ -10,6 +10,15 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 1. Lindungi file sensitif / internal dari akses URL langsung di browser
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase();
+  if (p.endsWith('.md') || p.endsWith('.py') || p === '/server.js' || p.startsWith('/data/')) {
+    return res.status(404).send('Not Found');
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, './')));
 
 app.get('/api/proxy', async (req, res) => {
@@ -23,6 +32,11 @@ app.get('/api/proxy', async (req, res) => {
 
   if (!targetUrl) {
     return res.status(400).json({ error: 'Missing target URL parameter' });
+  }
+
+  // Validasi Keamanan: Hanya izinkan link Google Spreadsheet resmi
+  if (!targetUrl.includes('docs.google.com/spreadsheets/')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya URL Google Spreadsheet resmi yang diizinkan.' });
   }
 
   let sheetId = null;
@@ -81,6 +95,11 @@ app.get('/api/proxy', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Server proxy error', message: err.message });
   }
+});
+
+// 2. SPA Routing Fallback: semua rute subpath dialihkan ke index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {

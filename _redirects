@@ -1,0 +1,3 @@
+# SPA Fallback Routing for Cloudflare Pages
+# Redirect any non-static subpaths back to index.html with 200 status (Single Page App)
+/*    /index.html   200

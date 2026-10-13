@@ -37,6 +37,14 @@ export async function onRequest(context) {
     });
   }
 
+  // Validasi Keamanan: Hanya izinkan link Google Sheets resmi, blokir akses file internal/server
+  if (!targetUrl.includes('docs.google.com/spreadsheets/')) {
+    return new Response(JSON.stringify({ error: 'Akses ditolak: Hanya URL Google Spreadsheet resmi yang diizinkan.' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   let sheetId = null;
   let serverFetchUrl = targetUrl.trim();
 

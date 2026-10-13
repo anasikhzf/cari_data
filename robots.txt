@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 
 # Sitemap Index for Google Search Console
-Sitemap: https://anasikhzf.web.app/sitemap.xml
+Sitemap: https://cari-data.pages.dev/sitemap.xml
